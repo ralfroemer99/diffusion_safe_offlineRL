@@ -149,7 +149,7 @@ class Trainer(object):
 
                 if self.train_test_split < 1:
                     test_loss = self.test()
-                    self.test_losses.append([self.step, loss])
+                    self.test_losses.append([self.step, test_loss])
                     if test_loss < self.best_test_loss:
                         self.best_test_loss = test_loss
                         self.save_best() 

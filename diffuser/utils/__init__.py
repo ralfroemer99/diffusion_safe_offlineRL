@@ -7,3 +7,4 @@ from .config import *
 from .arrays import *
 #from .colab import *
 from .logger import *
+from .plot import *

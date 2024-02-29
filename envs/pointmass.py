@@ -9,73 +9,58 @@ import math
 import random
 
 
-class Quad2DEnv(core.Env):
+class PointMassEnv(core.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 15}
 
     dt = 0.1
 
-    MASS = 0.1      # [kg]  Mass of the quadrotor
-    LENGTH = 0.1    # [m]   Length of the effective moment arm of the propellers
-    INERTIA = 1/12 * MASS * LENGTH**2  # [kg*m^2] Inertia of the quadrotor
-    GRAVITY = 9.81  # [m/s^2] Gravitational acceleration
+    MASS = 1        # [kg]  Mass of the quadrotor
 
     MAX_X = 5       # [m]   Maximum and minimum values of the x position
     MAX_Y = 5       # [m]   Maximum and minimum values of the y position
-    MAX_ANG = pi    # [rad] Maximum and minimum values of the angle
     MAX_VEL_X = 5   # [m/s] Maximum velocity in x direction
     MAX_VEL_Y = 5   # [m/s] Maximum velocity in y direction
-    MAX_VEL_ANG = 5 # [rad/s] Maximum angular velocity
 
-    AVAIL_TORQUE = [0.75, 1.25]        # Bounds on total torque in terms of hover thrust
+    MAX_ACC = 5        # Bounds on the tangential velocities of the wheels
 
-    torque_noise_max = 0.0
+    acc_noise_max = 0.0
 
     SCREEN_DIM = 500
 
     #: use dynamics equations from the nips paper or the book
-    # state = [x, dx, y, dy, theta, dtheta]
-    # action = [T_1, T_2]
-    # observation = [x, dx, y, dy, sin(theta), cos(theta), dtheta, x_des, y_des]
+    # state = [x, dx, y, dy]
+    # action = [ddx, ddy]
+    # observation = [x, dx, y, dy, x_des, y_des]
 
-    def __init__(self, min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, g=9.81, 
-                 target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
+    def __init__(self, target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
                  reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True):
         self.screen = None
         self.clock = None
         self.isopen = True
-        self.name = "Quad2DEnv"
+        self.name = "PointMassEnv"
         self.theta_as_sine_cosine = theta_as_sine_cosine
         
         # Observation space bounds
-        if self.theta_as_sine_cosine:
-            obs_high = np.array(
-                [self.MAX_X, self.MAX_VEL_X, self.MAX_Y, self.MAX_VEL_Y, 1, 1, self.MAX_VEL_ANG, self.MAX_X, self.MAX_Y], dtype=np.float32
-            )
-        else:
-            obs_high = np.array(
-                [self.MAX_X, self.MAX_VEL_X, self.MAX_Y, self.MAX_VEL_Y, self.MAX_ANG, self.MAX_VEL_ANG, self.MAX_X, self.MAX_Y], dtype=np.float32
-            )
+        obs_high = np.array(
+            [self.MAX_X, self.MAX_VEL_X, self.MAX_Y, self.MAX_VEL_Y, self.MAX_X, self.MAX_Y], dtype=np.float32
+        )
         obs_low = -obs_high
 
         # State space bounds
         state_high = np.array(
-            [self.MAX_X, self.MAX_VEL_X, self.MAX_Y, self.MAX_VEL_Y, self.MAX_ANG, self.MAX_VEL_ANG], dtype=np.float32
+            [self.MAX_X, self.MAX_VEL_X, self.MAX_Y, self.MAX_VEL_Y], dtype=np.float32
         )
         state_low = -state_high
 
         # Action space bounds
-        self.min_thrust = min_rel_thrust * self.MASS * self.GRAVITY / 2
-        self.max_thrust = max_rel_thrust * self.MASS * self.GRAVITY / 2
-        action_low = np.array([self.min_thrust, self.min_thrust], dtype=np.float32)
-        action_high = np.array([self.max_thrust, self.max_thrust], dtype=np.float32)
-        self.max_thrust_difference = max_rel_thrust_difference * self.MASS * self.GRAVITY
+        action_low = np.array([-self.MAX_ACC, -self.MAX_ACC], dtype=np.float32)
+        action_high = np.array([self.MAX_ACC, self.MAX_ACC], dtype=np.float32)
 
         self.state_space = spaces.Box(low=state_low, high=state_high, dtype=np.float32)
         self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float32)
         self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32)
         self.state = None
-        self.g = g
 
         if target:
             self.target = target
@@ -95,11 +80,6 @@ class Quad2DEnv(core.Env):
         self.reset_out_of_bounds = reset_out_of_bounds
         self.bonus_reward = bonus_reward
         self.initial_state = initial_state
-        
-
-    # def h(self, x, y):
-    #     a = np.linalg.norm(np.array([x, y] - np.array([self.x0, self.y0]))) - np.square(self.r)
-    #     return a
 
     def reset(
         self,
@@ -129,7 +109,7 @@ class Quad2DEnv(core.Env):
         else:
             return self._get_ob(), {}
 
-    def _sample_target(self):
+    def _sample_target(self, seed=None):
         # Random x target position in [-self.MAX_X, self.MAX_X]
         x = 2 * self.MAX_X * (self.np_random.rand() - 0.5)
 
@@ -153,19 +133,19 @@ class Quad2DEnv(core.Env):
     def step(self, a):
         s = self.state
         assert s is not None, "Call reset before using AcrobotEnv object."
-        thrust = a
+        acc = a
 
         #add torque limit
-        thrust = np.clip(thrust, a_min=self.min_thrust, a_max=self.max_thrust)
+        acc = np.clip(acc, a_min=-self.MAX_ACC, a_max=self.MAX_ACC)
 
         # Add noise to the force action
-        if self.torque_noise_max > 0:
-            thrust += self.np_random.uniform(
-                -self.torque_noise_max, self.torque_noise_max
+        if self.acc_noise_max > 0:
+            acc += self.np_random.uniform(
+                -self.acc_noise_max, self.acc_noise_max
             )
 
         # Now, augment the state with our force action so it can be passed to _dsdt
-        s_augmented = np.append(s, thrust)
+        s_augmented = np.append(s, acc)
 
         ns = rk4(self._dsdt, s_augmented, [0, self.dt])
 
@@ -173,8 +153,6 @@ class Quad2DEnv(core.Env):
         ns[1] = bound(ns[1], -self.MAX_VEL_X, self.MAX_VEL_X)
         ns[2] = bound(ns[2], -self.MAX_Y, self.MAX_Y)
         ns[3] = bound(ns[3], -self.MAX_VEL_Y, self.MAX_VEL_Y)
-        ns[4] = wrap(ns[4], -self.MAX_ANG, self.MAX_ANG)
-        ns[5] = bound(ns[5], -self.MAX_VEL_ANG, self.MAX_VEL_ANG)
 
         self.prev_state = self.state
         self.state = ns
@@ -187,24 +165,14 @@ class Quad2DEnv(core.Env):
     
     def sample_action(self):
         a = self.action_space.sample()
-        if self.max_thrust_difference > 0:
-            a[1] = a[0] + self.np_random.uniform(-self.max_thrust_difference, self.max_thrust_difference)
-            while a[1] < self.min_thrust or a[1] > self.max_thrust:
-                a[1] = a[0] + self.np_random.uniform(-self.max_thrust_difference, self.max_thrust_difference)
-            # a[1] = np.clip(a[1], a[0] - self.max_thrust_difference, a[0] + self.max_thrust_difference)
         return a
 
     def _get_ob(self):
         s = self.state
         assert s is not None, "Call reset before using AcrobotEnv object."
-        if self.theta_as_sine_cosine:
-            return np.array(
-                [s[0], s[1], s[2], s[3], sin(s[4]), cos(s[4]), s[5], self.target[0], self.target[1]], dtype=np.float32
-            )
-        else:
-            return np.array(
-                [s[0], s[1], s[2], s[3], s[4], s[5], self.target[0], self.target[1]], dtype=np.float32
-            )
+        return np.array(
+            [s[0], s[1], s[2], s[3], self.target[0], self.target[1]], dtype=np.float32
+        )
 
     def _get_coordinates(self, state):
         p = [state[0], state[2]]
@@ -213,15 +181,12 @@ class Quad2DEnv(core.Env):
     def _get_distance_to_target(self):
         p = self._get_coordinates(self.state)
         distance = np.linalg.norm(np.array(p) - np.array(self.target))
-        # print("=======")
-        # print("distance", distance)
-        # if distance <= self.epsilon:
-        #     print("target reached!")
         return distance
 
     def _get_reward(self):
         distance = self._get_distance_to_target()
-        reward = -distance ** 2
+        # reward = -distance ** 2
+        reward = -distance
         if distance <= self.epsilon:
             if self.bonus_reward:
                 reward += 1000.0
@@ -238,9 +203,7 @@ class Quad2DEnv(core.Env):
             if self.state[0] <= -self.MAX_X + 1e-4 or self.state[0] >= self.MAX_X - 1e-4 or \
                 self.state[1] <= -self.MAX_VEL_X + 1e-4 or self.state[1] >= self.MAX_VEL_X - 1e-4 or \
                 self.state[2] <= -self.MAX_Y + 1e-4 or self.state[2] >= self.MAX_Y - 1e-4 or \
-                self.state[3] <= -self.MAX_VEL_Y + 1e-4 or self.state[3] >= self.MAX_VEL_Y - 1e-4 or \
-                self.state[5] <= -self.MAX_VEL_ANG + 1e-4 or self.state[5] >= self.MAX_VEL_ANG - 1e-4:
-                # self.state[4] <= -self.MAX_ANG + 1e-4 or self.state[4] >= self.MAX_ANG - 1e-4 or \
+                self.state[3] <= -self.MAX_VEL_Y + 1e-4 or self.state[3] >= self.MAX_VEL_Y - 1e-4:
                 # print("Out of bounds!!!")
                 return True
 
@@ -251,31 +214,20 @@ class Quad2DEnv(core.Env):
         return False
 
     def inverse_dynamics(self, s_next):
-        # Get parameters
         m = self.MASS
-        i = self.INERTIA
-        g = self.g
 
+        # Unpack the state
         s = self.state
-
-        # Unpack the state and action
-        dx, dy, theta, dtheta = s[1], s[3], s[4], s[5]
-        dx_next, dy_next, theta_next, dtheta_next = s_next[1], s_next[3], s_next[4], s_next[5]
+        dx, dy = s[1], s[3]
+        dx_next, dy_next = s_next[1], s_next[3]
 
         # Get accelerations
         ddx = (dx_next - dx) / self.dt
         ddy = (dy_next - dy) / self.dt
-        ddtheta = (dtheta_next - dtheta) / self.dt
-
-        # Thrust sum
-        sum = m * np.sqrt(ddx**2 + (ddy + g)**2)
-        
-        # Thrust difference
-        diff = i * ddtheta / self.LENGTH
 
         # Solve for the forces
-        a1 = (sum + diff) / 2
-        a2 = (sum - diff) / 2
+        a1 = ddx / m
+        a2 = ddy / m
 
         return (a1, a2)
 
@@ -329,7 +281,7 @@ class Quad2DEnv(core.Env):
         return dataset
     
     def get_dataset(self):
-        path = 'data/quad2d_dataset.pkl'
+        path = 'data/pointmass_dataset.pkl'
         # Check if there is a file at the specified path
         try:
             with open(path, 'rb') as f:
@@ -344,20 +296,17 @@ class Quad2DEnv(core.Env):
     def _dsdt(self, s_augmented):
         # Get parameters
         m = self.MASS
-        i = self.INERTIA       
-        g = self.g
 
         # Unpack the state and action
         a1 = s_augmented[-2]
         a2 = s_augmented[-1]
         s = s_augmented[:-1]
-        _, dx, _, dy, theta, dtheta = s[0], s[1], s[2], s[3], s[4], s[5]
+        _, dx, _, dy = s[0], s[1], s[2], s[3]
 
-        ddx = - 1/m * (a1 + a2) * sin(theta)
-        ddy = 1/m * (a1 + a2) * cos(theta) - g
-        ddtheta = 1/i * (self.LENGTH * (a1 - a2))
+        ddx = 1 / m * a1
+        ddy = 1 / m * a2
 
-        return (dx, ddx, dy, ddy, dtheta, ddtheta, 0.0, 0.0)
+        return (dx, ddx, dy, ddy, 0.0, 0.0)
 
     # def render(self, mode="human"):
     #     try:
@@ -534,4 +483,4 @@ def rk4(derivs, y0, t):
         k4 = np.asarray(derivs(y0 + dt * k3))
         yout[i + 1] = y0 + dt / 6.0 * (k1 + 2 * k2 + 2 * k3 + k4)
     # We only care about the final timestep and we cleave off action value which will be zero
-    return yout[-1][:6]
+    return yout[-1][:4]

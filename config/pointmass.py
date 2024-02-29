@@ -50,7 +50,7 @@ base = {
         ## training
         'n_steps_per_epoch': 1000,  # 10000
         'loss_type': 'l2',
-        'n_train_steps': 2e5,       # 1e6
+        'n_train_steps': 1e5,       # 1e6
         'batch_size': 32,            # 32
         'learning_rate': 2e-5,      # 2e-4
         'gradient_accumulate_every': 2,
@@ -95,7 +95,7 @@ base = {
         ## training
         'n_steps_per_epoch': 1000,  # 10000
         'loss_type': 'value_l2',
-        'n_train_steps': 2e5,       # 200e3
+        'n_train_steps': 1e5,       # 200e3
         'batch_size': 32,            # 32
         'learning_rate': 2e-5,      # 2e-4
         'gradient_accumulate_every': 2,
@@ -122,7 +122,7 @@ base = {
 
         ## sample_kwargs
         'n_guide_steps': 2,
-        'scale': 1,
+        'scale': 100,
         't_stopgrad': 2,
         'scale_grad_by_std': True,
 
@@ -148,8 +148,8 @@ base = {
         'diffusion_loadpath': 'f:diffusion/defaults_H{horizon}_T{n_diffusion_steps}_A{use_actions}',
         'value_loadpath': 'f:values/defaults_H{horizon}_T{n_diffusion_steps}_A{use_actions}_d{discount}',
 
-        'diffusion_epoch': 'latest',      # 'latest'
-        'value_epoch': 'latest',          # 'latest'
+        'diffusion_epoch': 'best',      # 'latest'
+        'value_epoch': 'best',          # 'latest'
 
         'verbose': False,
         'suffix': '0',

@@ -1,115 +1,103 @@
+import pickle
 import numpy as np
-import os
-import torch
-import argparse
-import matplotlib.pyplot as plt
-from utils.logger import Logger
 from envs.quad_2d import Quad2DEnv
+import matplotlib.pyplot as plt
 
-parser = argparse.ArgumentParser()
+# Create Environment
+env = Quad2DEnv(min_rel_thrust=0.75, max_rel_thrust=1.25, 
+                max_rel_thrust_difference=0.01, target=None, max_steps=20,
+                epsilon=0.5, reset_target_reached=False, bonus_reward=False, 
+                reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10000)
 
-parser.add_argument('--num-episodes-trainset', type=int, default=100,
-                    help='Number of episodes for creating the trainset.')
-parser.add_argument('--num-episodes-testset', type=int, default=30,
-                    help='Number of episodes for creating the testset.')
-parser.add_argument('--num-steps', type=int, default=16,
-                    help='Number of steps in each episode.')
-parser.add_argument('--state-dim', type=int, default=9,
-                    help='State dimension.')
-parser.add_argument('--action-dim', type=int, default=2,
-                    help='Action dimension.')
-parser.add_argument('--min_rel_thrust', type=float, default=0.75,
-                    help='Maximum total thrust for the propellers.')
-parser.add_argument('--max_rel_thrust', type=float, default=1.25,
-                    help='Maximum total thrust for the propellers.')
-parser.add_argument('--max_rel_thrust_difference', type=float, default=0.01,
-                    help='Maximum difference between the propeller thrusts.')
-parser.add_argument('--epsilon', type=float, default=0.3,
-                    help='Tolerance for reaching the target.')
-parser.add_argument('--test', default=True,
-                    help='Generate training or testing dataset.')
-parser.add_argument('--training-dataset', type=str, default='quad2d_train.pkl',
-                    help='Training dataset.')
-parser.add_argument('--testing-dataset', type=str, default='quad2d_test.pkl',
-                    help='Testing dataset.')
-parser.add_argument('--seed', type=int, default=1,
-                    help='Random seed (default: 1).')
-parser.add_argument('--render', default=False,
-                    help='Render environment.')
+horizon = 16
+# env.seed(0)
 
-args = parser.parse_args()
+dataset = env.make_dataset()
 
-test = args.test
-if test:
-    data_file_name = args.testing_dataset
-    num_episodes = args.num_episodes_testset
-else:
-    data_file_name = args.training_dataset
-    num_episodes = args.num_episodes_trainset
-seed = args.seed
-max_steps = args.num_steps
-env = Quad2DEnv(min_rel_thrust=args.min_rel_thrust, max_rel_thrust=args.max_rel_thrust, 
-                max_rel_thrust_difference=args.max_rel_thrust_difference, target=None, max_steps=max_steps,
-                epsilon=args.epsilon, reset_target_reached=False, bonus_reward=False)
+# Save file
+with open('data/quad2d_dataset.pkl', 'wb') as f:
+    pickle.dump(dataset, f)
 
-state_dim = args.state_dim
-action_dim = args.action_dim
+theta = np.arctan2(dataset['observations'][:, 4], dataset['observations'][:, 5])
 
-# Make directory for saving the datasets
-directory = os.path.dirname(os.path.abspath(__file__))
-folder = os.path.join(directory + '/data/')
-logger = Logger(folder)
-if not os.path.exists(folder):
-    os.makedirs(folder)
+# print('x min: %f, x max: %f, x mean: %f' % np.mean(dataset['observations'][:, 0]))
+print('x min: %f, x max: %f, x mean: %f' % (np.min(dataset['observations'][:, 0]), np.max(dataset['observations'][:, 0]), np.mean(dataset['observations'][:, 0])))
+print('y min: %f, y max: %f, y mean: %f' % (np.min(dataset['observations'][:, 2]), np.max(dataset['observations'][:, 2]), np.mean(dataset['observations'][:, 2])))
+print('theta min: %f, theta max: %f, theta mean: %f' % (np.min(theta), np.max(theta), np.mean(theta)))
+print('dx min: %f, dx max: %f, dx mean: %f' % (np.min(dataset['observations'][:, 1]), np.max(dataset['observations'][:, 1]), np.mean(dataset['observations'][:, 1])))
+print('dy min: %f, dy max: %f, dy mean: %f' % (np.min(dataset['observations'][:, 3]), np.max(dataset['observations'][:, 3]), np.mean(dataset['observations'][:, 3])))
+print('dtheta min: %f, dtheta max: %f, dtheta mean: %f' % (np.min(dataset['observations'][:, 6]), np.max(dataset['observations'][:, 6]), np.mean(dataset['observations'][:, 6])))
 
-# Set seeds
-env.action_space.seed(seed)
-np.random.seed(seed)
+# Visualize dataset
+fig, ax = plt.subplots(3, 1, figsize=(10, 10))
+ax[0].scatter(dataset['observations'][:, 0], dataset['observations'][:, 2])
+ax[1].scatter(dataset['observations'][:, 1], dataset['observations'][:, 3])
+ax[2].scatter(dataset['actions'][:, 0], dataset['actions'][:, 1])
+plt.show()
 
-trajectories_all = []
-for episode in range(num_episodes):
-    state = env.reset()
-    trajectory = np.zeros((max_steps, state_dim + action_dim + 2))
-    for step in range(max_steps):
-        action = env.sample_action()
-        # Ensure that actions are not further apart than
-        next_state, reward, done, target_reached = env.step(action)
-        if args.render:
-            env.render()
-        logger.obslog((state, action, reward, next_state, done, 0))     # Last: dummy CBF value
-        trajectory[step, :state_dim] = state
-        trajectory[step, state_dim:state_dim + action_dim] = action
-        trajectory[step, -2] = reward
-        trajectory[step, -1] = done
-        state = next_state
-        if done:
-            break
-    trajectories_all.append(trajectory)
+# Visualize 100 position trajectories
+fig, ax = plt.subplots(10, 10, figsize=(10, 10))
+index_start = 0
+indices_end = [i for i, x in enumerate(dataset['terminals']) if x == 1]
+i = 0
+which_traj = 0
+while i < 100:
+    index_end = indices_end[which_traj]
+    if index_end - index_start < horizon:
+        which_traj += 1
+        index_start = index_end + 1
+        continue
 
-logger.save_obslog(filename=data_file_name)
+    observations = dataset['observations'][index_start:index_start + horizon]
+    index_start = index_end + 1
 
-# Plot the first ten trajectories
-fig, ax = plt.subplots(10, 11)
-labels = ['x', 'y', 'theta', 'dx', 'dy', 'dtheta', 'T1', 'T2', 'reward', 'done']
-for i in range(10):
-    ax[i, 0].plot(trajectories_all[i][:, 0])
-    ax[i, 1].plot(trajectories_all[i][:, 2])
-    ax[i, 2].plot(np.arctan2(trajectories_all[i][:, 4], trajectories_all[i][:, 5]))
-    ax[i, 3].plot(trajectories_all[i][:, 1])
-    ax[i, 4].plot(trajectories_all[i][:, 3])
-    ax[i, 5].plot(trajectories_all[i][:, 6])
-    ax[i, 6].plot(trajectories_all[i][:, 9])
-    ax[i, 7].plot(trajectories_all[i][:, 10])
-    ax[i, 8].plot(trajectories_all[i][:, 11])
-    ax[i, 9].plot(trajectories_all[i][:, 12])  
-    ax[i, 10].plot(trajectories_all[i][:, 0], trajectories_all[i][:, 2])
-    ax[i, 10].plot(trajectories_all[i][0, 0], trajectories_all[i][0, 2], 'ro')
-    ax[i, 10].plot(trajectories_all[i][0, 7], trajectories_all[i][0, 8], 'go')
-    # ax[i, 10].plot(trajectories_all[i][-1, 0], trajectories_all[i][-1, 2], 'rx')
-    for j in range(10):
-        ax[i, j].set_ylabel(labels[j])
-    ax[i, 10].set_ylabel('y')
-    ax[i, 10].set_xlabel('x')
-    ax[i, 10].set_xlim(-5, 5)
-    ax[i, 10].set_ylim(-5, 5)
+    # Plot observations
+    ax[i // 10, i % 10].plot(observations[:, 0], observations[:, 2])
+
+    i += 1
+
+plt.show()
+
+# Visualize all states of 10 trajectories
+n_plot = 10
+fig, ax = plt.subplots(n_plot, 10, figsize=(10, 10))
+labels = ['x', 'y', 'theta', 'dx', 'dy', 'dtheta', 'T1', 'T2', 'reward']
+
+index_start = 0
+indices_end = [i for i, x in enumerate(dataset['terminals']) if x == 1]
+i = 0
+which_traj = 0
+while i < n_plot:
+    index_end = indices_end[which_traj]
+    if index_end - index_start < horizon:
+        which_traj += 1
+        index_start = index_end + 1
+        continue
+
+    # observations = dataset['observations'][index_start:index_end + 1]
+    # actions = dataset['actions'][index_start:index_end + 1]
+    # rewards = dataset['rewards'][index_start:index_end + 1]
+    observations = dataset['observations'][index_start:index_start + horizon]
+    actions = dataset['actions'][index_start:index_start + horizon]
+    rewards = dataset['rewards'][index_start:index_start + horizon]
+    index_start = index_end + 1
+
+    # Plot observations
+    ax[i, 0].plot(observations[:, 0])
+    ax[i, 1].plot(observations[:, 2])
+    ax[i, 2].plot(np.arctan2(observations[:, 4], observations[:, 5]))
+    ax[i, 3].plot(observations[:, 1])
+    ax[i, 4].plot(observations[:, 3])
+    ax[i, 5].plot(observations[:, 6])
+    ax[i, 6].plot(actions[:, 0])
+    ax[i, 7].plot(actions[:, 1])
+    ax[i, 8].plot(rewards)
+    ax[i, 9].plot(observations[:, 0], observations[:, 2])
+    ax[i, 9].plot(observations[0, 0], observations[0, 2], 'go')
+    ax[i, 9].plot(observations[0, 7], observations[0, 8], 'ro')
+    for _ in range(9):
+        ax[i, _].set_ylabel(labels[_])
+    i += 1
+    
+
 plt.show()

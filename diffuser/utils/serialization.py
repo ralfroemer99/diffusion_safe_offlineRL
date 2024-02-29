@@ -7,7 +7,7 @@ import pdb
 from collections import namedtuple
 
 # DiffusionExperiment = namedtuple('Diffusion', 'dataset renderer model diffusion ema trainer epoch')
-DiffusionExperiment = namedtuple('Diffusion', 'dataset model diffusion ema trainer epoch')
+DiffusionExperiment = namedtuple('Diffusion', 'dataset model diffusion ema trainer epoch losses')
 
 def mkdir(savepath):
     """
@@ -23,7 +23,11 @@ def get_latest_epoch(loadpath):
     states = glob.glob1(os.path.join(*loadpath), 'state_*')
     latest_epoch = -1
     for state in states:
-        epoch = int(state.replace('state_', '').replace('.pt', ''))
+        try:
+            epoch = int(state.replace('state_', '').replace('.pt', ''))
+        except ValueError:
+            epoch = -1
+        # epoch = int(state.replace('state_', '').replace('.pt', ''))
         latest_epoch = max(epoch, latest_epoch)
     return latest_epoch
 
@@ -33,6 +37,16 @@ def load_config(*loadpath):
     print(f'[ utils/serialization ] Loaded config from {loadpath}')
     # print(config)
     return config
+
+def load_losses(*loadpath):
+    loadpath = os.path.join(*loadpath)
+    if os.path.exists(loadpath):
+        losses = pickle.load(open(loadpath, 'rb'))
+        print(f'[ utils/serialization ] Loaded losses from {loadpath}')
+        return losses
+    else:
+        print(f'[ utils/serialization ] File {loadpath} does not exist')
+        return None
 
 def load_diffusion(*loadpath, epoch='latest', device='cuda:0', seed=None):
     dataset_config = load_config(*loadpath, 'dataset_config.pkl')
@@ -60,8 +74,10 @@ def load_diffusion(*loadpath, epoch='latest', device='cuda:0', seed=None):
 
     trainer.load(epoch)
 
+    losses = load_losses(*loadpath, 'losses.pkl')
+
     # return DiffusionExperiment(dataset, renderer, model, diffusion, trainer.ema_model, trainer, epoch)
-    return DiffusionExperiment(dataset, model, diffusion, trainer.ema_model, trainer, epoch)
+    return DiffusionExperiment(dataset, model, diffusion, trainer.ema_model, trainer, epoch, losses)
 
 def check_compatibility(experiment_1, experiment_2):
     '''

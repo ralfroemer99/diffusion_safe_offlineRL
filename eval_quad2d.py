@@ -30,6 +30,15 @@ value_experiment = utils.load_diffusion(
     epoch=args.value_epoch, seed=args.seed,
 )
 
+diffusion_losses = diffusion_experiment.losses
+value_losses = value_experiment.losses
+
+# Plot losses
+fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+utils.plot_losses(diffusion_losses, ax=ax[0], title='Diffusion losses')
+utils.plot_losses(value_losses, ax=ax[1], title='Value losses')
+plt.show()
+
 # utils.check_compatibility(diffusion_experiment, value_experiment)
 
 diffusion = diffusion_experiment.ema
@@ -60,9 +69,9 @@ policy = policy_config()
 #--------------------------------- main loop ---------------------------------#
 #-----------------------------------------------------------------------------#
 
-which_experiments = [0, 1, 0, 0]
+which_experiments = [1, 1, 0]
 # simulation_timesteps = 40
-labels = ['x', 'y', 'theta', 'dx', 'dy', 'dtheta', 'T1', 'T2', 'reward']
+labels = ['x', 'dx', 'y', 'dy', 'theta', 'dtheta', 'T1', 'T2', 'reward']
 
 batch_size = 100
 
@@ -73,7 +82,7 @@ batch_size = 100
 if which_experiments[0]:
     env = Quad2DEnv(min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, 
                     target=None, max_steps=20, initial_state=None, 
-                    epsilon=0.2, reset_target_reached=False, bonus_reward=True, 
+                    epsilon=0.5, reset_target_reached=False, bonus_reward=True, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
     fig, ax = plt.subplots(10, 10)
@@ -105,7 +114,7 @@ if which_experiments[0]:
 if which_experiments[1]:
     env = Quad2DEnv(min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, 
                     target=[1, 1], max_steps=20, initial_state=[0, 0, 0, 1, 0, 0], 
-                    epsilon=0.2, reset_target_reached=False, bonus_reward=True, 
+                    epsilon=0.5, reset_target_reached=False, bonus_reward=True, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
     obs = env.reset()
@@ -116,7 +125,7 @@ if which_experiments[1]:
     # Sample open-loop plan
     action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False) 
     observations = samples.observations
-    # actions = samples.actions
+    actions = samples.actions if args.use_actions else None
     right_direction_counter = 0
     for i in range(batch_size):
         if observations[i, -1, 0] < 0:
@@ -128,14 +137,13 @@ if which_experiments[1]:
     fig, ax = plt.subplots(min(batch_size, 10), 9)
     fig.suptitle('Open-loop plan')
     for i in range(min(batch_size, 10)):
-        ax[i, 0].plot(observations[i, :, 0], 'b')  # x
-        ax[i, 1].plot(observations[i, :, 2], 'b')  # y
-        ax[i, 2].plot(np.arctan2(observations[i, :, 4], observations[i, :, 5]), 'b')  # theta
-        ax[i, 3].plot(observations[i, :, 1], 'b')  # dx
-        ax[i, 4].plot(observations[i, :, 3], 'b')  # dy
+        for j in range(4):
+            ax[i, j].plot(observations[i, :, j], 'b')       
+        ax[i, 4].plot(np.arctan2(observations[i, :, 4], observations[i, :, 5]), 'b')  # theta
         ax[i, 5].plot(observations[i, :, 6], 'b')  # dtheta
-        # ax[i, 6].plot(actions[i, :, 0], 'b')       # T1
-        # ax[i, 7].plot(actions[i, :, 1], 'b')       # T2
+        if args.use_actions:
+            ax[i, 6].plot(actions[i, :, 0], 'b')       # T1
+            ax[i, 7].plot(actions[i, :, 1], 'b')       # T2
         ax[i, 8].plot(observations[i, :, 0], observations[i, :, 2], 'b')   # trajectory
         ax[i, 8].plot(observations[i, 0, 0], observations[i, 0, 2], 'go')  # start
         ax[i, 8].plot(obs[7], obs[8], 'ro')        # goal
@@ -169,46 +177,82 @@ if which_experiments[1]:
 #-----------------------------------------------------------------------------#
 
 if which_experiments[2]:
-    # Reset environment
-    obs = env.reset()
+    env = Quad2DEnv(min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, 
+                    target=None, max_steps=100, initial_state=None, 
+                    epsilon=0.5, reset_target_reached=False, bonus_reward=True, 
+                    reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
-    observations_cl = np.zeros(env.max_steps, 9)
-    observations_cl[0, :] = obs
-    actions_cl = np.zeros(env.max_steps, 2)
-    rewards_cl = np.zeros(env.max_steps)
-    for _ in range(env.max_steps - 1):
-        # Get current state
-        conditions = {0: env.state}
-        
-        # Sample action
-        action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False)
+    n_trials = 5
+    fig, ax = plt.subplots(min(n_trials, 5), 9)
+    n_reached = 0
+    for n in range(n_trials):
+        # Reset environment
+        obs = env.reset()
+        print('Environment %d, initial pos: %s, target: %s' % (n, [obs[0], obs[2]], env.target))
 
-        # Step environment
-        obs, reward, done, target_reached = env.step(action)
+        observations_cl = np.zeros((env.max_steps, 9))
+        observations_cl[0, :] = obs
+        actions_cl = np.zeros((env.max_steps, 2))
+        rewards_cl = np.zeros((env.max_steps))
+        for _ in range(env.max_steps - 1):
+            # Get current state
+            conditions = {0: obs}
+            
+            # Sample state sequence or state-action sequence
+            action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False)
+            if _ == 0:
+                observations_ol = samples.observations
+                actions_ol = samples.actions if args.use_actions else None
 
-        # Log
-        observations_cl[_, :] = obs
-        actions_cl[_, :] = action
-        rewards_cl[_] = reward
+            # Step environment
+            if args.use_actions:
+                obs, reward, done, target_reached = env.step(action)
 
-        if done:
-            break
+            # Log
+            if _ < env.max_steps - 1:
+                observations_cl[_ + 1, :] = obs
+            actions_cl[_, :] = action
+            rewards_cl[_] = reward
 
-    # Plot closed-loop trajectories
-    fig, ax = plt.subplots(1, 9)
-    ax[0].plot(observations_cl[:, 0])  # x
-    ax[1].plot(observations_cl[:, 2])  # y
-    ax[2].plot(np.arctan2(observations_cl[:, 4], observations_cl[:, 5]))  # theta
-    ax[3].plot(observations_cl[:, 1])  # dx
-    ax[4].plot(observations_cl[:, 3])  # dy
-    ax[5].plot(observations_cl[:, 6])  # dtheta
-    ax[6].plot(actions_cl[:, 0])       # T1
-    ax[7].plot(actions_cl[:, 1])       # T2
-    ax[8].plot(observations_cl[:, 0], observations_cl[:, 2])   # trajectory
-    ax[8].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
-    ax[8].plot(observations_cl[0, 7], observations_cl[0, 8], 'ro')  # goal
+            if target_reached:
+                n_reached += 1
 
-    for _ in range(9):
-        ax[_].set_ylabel(labels[_])
+            if done:
+                observations_cl = observations_cl[:_ + 1, :]
+                actions_cl = actions_cl[:_ + 1, :]
+                rewards_cl = rewards_cl[:_ + 1]
+                break
+
+        # Plot closed-loop trajectories
+        if n < 5:
+            ax_cur = ax[n] if len(ax.shape) > 1 else ax
+            for i in range(4):
+                ax_cur[i].plot(observations_cl[:, i])                                   # x, y, dx, dy
+                for j in range(5):
+                    ax_cur[i].plot(observations_ol[j, :, i], 'r')
+            ax_cur[4].plot(np.arctan2(observations_cl[:, 4], observations_cl[:, 5]))    # theta
+            ax_cur[5].plot(observations_cl[:, 6])                                       # dtheta
+            for j in range(5):
+                ax_cur[4].plot(np.arctan2(observations_ol[j, :, 4], observations_ol[j, :, 5]), 'r')
+                ax_cur[5].plot(observations_ol[j, :, 6], 'r')
+            
+            for i in range(2):
+                ax_cur[i + 6].plot(actions_cl[:, i])
+                if args.use_actions:
+                    for j in range(5):
+                        ax_cur[i + 6].plot(actions_ol[j, :, i], 'r')
+            ax_cur[8].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
+            ax_cur[8].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
+            ax_cur[8].plot(observations_cl[0, 7], observations_cl[0, 8], 'ro')  # goal
+            for j in range(5):
+                ax_cur[8].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
+            ax_cur[8].set_xlim(-5, 5)
+            ax_cur[8].set_ylim(-5, 5)
+            ax_cur[8].legend()
+
+            for _ in range(8):
+                ax_cur[_].set_ylabel(labels[_])
+
+    print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%')
 
     plt.show()
