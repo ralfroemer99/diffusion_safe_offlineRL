@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
@@ -69,7 +70,7 @@ policy = policy_config()
 #--------------------------------- main loop ---------------------------------#
 #-----------------------------------------------------------------------------#
 
-which_experiments = [0, 0, 1]
+which_experiments = [0, 0, 0, 1]
 # simulation_timesteps = 40
 labels = ['x', 'dx', 'y', 'dy', 'u1', 'u2', 'reward']
 
@@ -150,15 +151,17 @@ if which_experiments[1]:
     plt.show()
 
 #-----------------------------------------------------------------------------#
-#-----------------------------Closed-loop experiment--------------------------#
+#-----------------Closed-loop experiment without obstacles--------------------#
 #-----------------------------------------------------------------------------#
 
 if which_experiments[2]:
+    batch_size = 1
+
     env = PointMassEnv(target=None, max_steps=100, initial_state=None, 
                     epsilon=0.2, reset_target_reached=True, bonus_reward=True, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
-    n_trials = 100
+    n_trials = 10
     fig, ax = plt.subplots(min(n_trials, 5), 7)
     n_reached = 0
     mean_steps = 0
@@ -176,7 +179,7 @@ if which_experiments[2]:
             conditions = {0: obs}
             
             # Sample state sequence or state-action sequence
-            action, samples = policy(conditions=conditions, batch_size=1, verbose=False)
+            action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False)
             if _ == 0:
                 observations_ol = samples.observations
                 actions_ol = samples.actions if args.use_actions else None
@@ -204,30 +207,129 @@ if which_experiments[2]:
                 break
 
         # Plot closed-loop trajectories
-        # if n < 5:
-        #     ax_cur = ax[n] if len(ax.shape) > 1 else ax
-        #     for i in range(4):
-        #         ax_cur[i].plot(observations_cl[:, i])
-        #         for j in range(5):
-        #             ax_cur[i].plot(observations_ol[j, :, i], 'r')
-        #     for i in range(2):
-        #         ax_cur[i + 4].plot(actions_cl[:, i])
-        #         if args.use_actions:
-        #             for j in range(5):
-        #                 ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
-        #     ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
-        #     ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
-        #     ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
-        #     for j in range(5):
-        #         ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
-        #     ax_cur[6].set_xlim(-5, 5)
-        #     ax_cur[6].set_ylim(-5, 5)
-        #     ax_cur[6].legend()
+        if n < 5:
+            ax_cur = ax[n] if len(ax.shape) > 1 else ax
+            for i in range(4):
+                ax_cur[i].plot(observations_cl[:, i])
+                for j in range(min(batch_size, 5)):
+                    ax_cur[i].plot(observations_ol[j, :, i], 'r')
+            for i in range(2):
+                ax_cur[i + 4].plot(actions_cl[:, i])
+                if args.use_actions:
+                    for j in range(min(batch_size, 5)):
+                        ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
+            ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
+            ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
+            ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
+            for j in range(min(batch_size, 5)):
+                ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
+            ax_cur[6].set_xlim(-5, 5)
+            ax_cur[6].set_ylim(-5, 5)
+            ax_cur[6].legend()
 
-        #     for _ in range(6):
-        #         ax_cur[_].set_ylabel(labels[_])
+            for _ in range(6):
+                ax_cur[_].set_ylabel(labels[_])
 
-    print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}')
+    if n_reached > 0:
+        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}')
+    else:
+        print(f'Goal not reached in any of the {n_trials} cases')
+    print(f'Scale: {args.scale}')
+
+    plt.show()
+
+#-----------------------------------------------------------------------------#
+#-----------------Closed-loop experiment without obstacles--------------------#
+#-----------------------------------------------------------------------------#
+if which_experiments[3]:
+    batch_size = 10
+
+    env = PointMassEnv(target=None, max_steps=100, initial_state=None, epsilon=0.5, reset_target_reached=True, 
+                       bonus_reward=True, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
+                       n_moving_obstacles=0, n_static_obstacles=10)
+
+    n_trials = 10
+    fig, ax = plt.subplots(min(n_trials, 5), 7)
+    n_reached = 0
+    mean_steps = 0
+    for n in range(n_trials):
+        # Reset environment
+        obs = env.reset(seed=n)
+        # print('Env %d, initial pos: %s, target: %s' % (n, [obs[0], obs[2]], env.target))
+
+        observations_cl = np.zeros((env.max_steps, 6))
+        observations_cl[0, :] = obs
+        actions_cl = np.zeros((env.max_steps, 2))
+        rewards_cl = np.zeros((env.max_steps))
+        for _ in range(env.max_steps - 1):           
+            # Get current state
+            conditions = {0: obs}
+            
+            # Sample state sequence or state-action sequence
+            unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon)
+            start_time = time.time()
+            action, samples = policy(conditions=conditions, batch_size=batch_size, unsafe_bounds=unsafe_bounds, verbose=False)
+            print(f'Action computation took: {time.time() - start_time}')
+            # action_unsafe, samples_unsafe = policy(conditions=conditions, batch_size=batch_size, verbose=False)
+            if _ == 0:
+                observations_ol = samples.observations
+                actions_ol = samples.actions if args.use_actions else None
+
+            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
+
+            # Step environment
+
+            if args.use_actions:
+                # action = env.sample_action()
+                obs, reward, done, target_reached = env.step(action)
+
+            # Log
+            if _ < env.max_steps - 1:
+                observations_cl[_ + 1, :] = obs
+            actions_cl[_, :] = action
+            rewards_cl[_] = reward
+
+            if target_reached == True:
+                n_reached += 1
+                mean_steps += _ + 1
+                print(f'Env {n}: REACHED in {_} steps, current success rate: {n_reached / (n + 1) * 100}%')
+
+            if target_reached == -1:
+                print(f'Env {n}: COLLISION in {_} steps')
+
+            if done:
+                observations_cl = observations_cl[:_ + 1, :]
+                actions_cl = actions_cl[:_ + 1, :]
+                rewards_cl = rewards_cl[:_ + 1]
+                break
+
+        # Plot closed-loop trajectories
+        if n < 5:
+            ax_cur = ax[n] if len(ax.shape) > 1 else ax
+            for i in range(4):
+                ax_cur[i].plot(observations_cl[:, i])
+                for j in range(min(batch_size, 5)):
+                    ax_cur[i].plot(observations_ol[j, :, i], 'r')
+            for i in range(2):
+                ax_cur[i + 4].plot(actions_cl[:, i])
+                if args.use_actions:
+                    for j in range(min(batch_size, 5)):
+                        ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
+            ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
+            ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
+            ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
+            for j in range(min(batch_size, 5)):
+                ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
+            ax_cur[6].set_xlim(-5, 5)
+            ax_cur[6].set_ylim(-5, 5)
+            ax_cur[6].legend()
+
+            for _ in range(6):
+                ax_cur[_].set_ylabel(labels[_])
+    if n_reached > 0:
+        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}')
+    else:
+        print(f'Goal not reached in any of the {n_trials} cases')
     print(f'Scale: {args.scale}')
 
     plt.show()

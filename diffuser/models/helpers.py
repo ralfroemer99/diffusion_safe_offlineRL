@@ -141,21 +141,73 @@ def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
 
 def apply_conditioning(x, conditions, action_dim, goal_dim=0):
     for t, val in conditions.items():
+        if t == 'unsafe_bounds':     # unsafe sets
+            continue
         if val.shape[-1] == x.shape[-1]:
             x[:, t, :] = val.clone()
         else:
             x[:, t, action_dim:] = val.clone()
     
     if goal_dim > 0:
-        x[:, :, -goal_dim:] = conditions[t][:, -goal_dim:].unsqueeze(1).clone()
+        x[:, :, -goal_dim:] = conditions[0][:, -goal_dim:].unsqueeze(1).clone()
     
+    if conditions.get('unsafe_bounds') is not None:
+        x = apply_projection(x, conditions['unsafe_bounds'], action_dim)
+
+    return x
+
+def apply_projection(x, unsafe_bounds, action_dim):
+    '''
+        x : tensor
+            [ batch_size x horizon x transition_dim ]
+        unsafe_bounds : dict
+            { t: sets }, where sets is a obs_dim x (2 * n_obs) array
+    '''
+    for t, bounds in unsafe_bounds.items():     # for each time step
+        for n in range(bounds.shape[1] // 2):        # for each unsafe set
+            bound = bounds[:, 2 * n:2 * n + 2]
+            dims = torch.where(bound.max(dim=1).values != bound.min(dim=1).values)[0]       # get the relevant dimensions for which constraints are specified
+            
+            if len(dims) == 0:
+                continue
+            
+            # Check if the relevant dimensions are within the unsafe set
+            obs = x[:, t, action_dim:]
+            mask = torch.all(torch.stack([(obs[:, dim] > bound[dim, 0]) & (obs[:, dim] < bound[dim, 1]) for dim in dims]), axis=0)
+            
+            # If it is, project it to the boundary of the unsafe set
+            if mask.any():
+                for _ in torch.where(mask)[0]:
+                    pos = x[_, t, action_dim+dims]
+                    pos_min = bound[dims, 0]
+                    pos_max = bound[dims, 1]
+
+                    # pos = project_out(pos, pos_min, pos_max)
+                    x[_, t, action_dim+dims] = pos
+        
+    return x
+
+def project_out(x, x_min, x_max):
+    '''
+        x : tensor
+            [dim_size]
+        x_min, x_max : tensor
+            [dim_size]
+    '''
+    
+    # Change one value of x so that x_min <= x <= x_max does not hold. Choose the value that is closest to the boundary
+    distances = torch.stack([x - x_min, x_max - x])
+    min_idx = torch.argmin(distances)
+    dim, min_or_max = torch.div(min_idx, distances.shape[0], rounding_mode='floor'), min_idx % distances.shape[0]
+
+    x[dim] = x_min[dim] if min_or_max == 0 else x_max[dim]
+
     return x
 
 # def apply_conditioning(x, conditions, action_dim):
 #     for t, val in conditions.items():
 #         x[:, t, action_dim:] = val.clone()
 #     return x
-
 
 #-----------------------------------------------------------------------------#
 #---------------------------------- losses -----------------------------------#
