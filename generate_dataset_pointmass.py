@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 # Create Environment
 env = PointMassEnv(target=None, max_steps=20, epsilon=0.2, reset_target_reached=False, bonus_reward=False, 
-                reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10000)
+                reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=100000)
 
 horizon = 16
 # env.seed(0)

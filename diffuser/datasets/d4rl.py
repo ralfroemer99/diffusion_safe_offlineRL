@@ -21,10 +21,10 @@ def suppress_output():
         with redirect_stderr(fnull) as err, redirect_stdout(fnull) as out:
             yield (err, out)
 
-with suppress_output():
+# with suppress_output():
     ## d4rl prints out a variety of warnings
-    import d4rl
-
+    # import d4rl
+ 
 #-----------------------------------------------------------------------------#
 #-------------------------------- general api --------------------------------#
 #-----------------------------------------------------------------------------#

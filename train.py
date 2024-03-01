@@ -14,7 +14,7 @@ from envs.pointmass import PointMassEnv
 train = 0
 train_values = 0
 
-exp = 'quad2d'
+exp = 'pointmass'
 
 class Parser(utils.Parser):
     dataset: str = exp

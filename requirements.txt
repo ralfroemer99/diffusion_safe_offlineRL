@@ -1,3 +1,4 @@
+swig==4.1.1
 absl-py==1.4.0
 ale-py==0.7.5
 attrs==22.2.0
@@ -14,7 +15,7 @@ Cython==0.29.33
 d4rl==1.1
 decorator==4.4.2
 # Editable install with no version control (diffuser==0.0.0)
--e /home/ralf/projects/diffusion_planning_2dof/diffuser
+#-e /home/ralf/projects/diffusion_planning_2dof/diffuser
 dm-control==1.0.9
 dm-env==1.6
 dm-tree==0.1.8
@@ -43,8 +44,8 @@ matplotlib==3.6.3
 mjrl @ git+https://github.com/aravindr93/mjrl@3871d93763d3b49c4741e6daeaebbc605fe140dc
 mock==5.0.1
 moviepy==1.0.3
-mujoco==3.1.2
-mujoco-py==2.1.2.14
+# mujoco==3.1.2
+# mujoco-py==2.1.2.14
 mypy-extensions==0.4.3
 numpy==1.23.5
 opencv-python==4.7.0.68
@@ -66,12 +67,11 @@ scikit-learn==1.2.0
 scipy==1.10.0
 six==1.16.0
 smmap==5.0.0
-swig==4.1.1
 termcolor==2.2.0
 threadpoolctl==3.1.0
 tomli==2.0.1
-torch==1.9.1+cu111
-torchvision==0.10.1+cu111
+# torch==1.9.1+cu111
+# torchvision==0.10.1+cu111
 tqdm==4.64.1
 trampoline==0.1.2
 typed-argument-parser==1.7.2
