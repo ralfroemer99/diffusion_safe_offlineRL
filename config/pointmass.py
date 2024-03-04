@@ -39,7 +39,7 @@ base = {
         'preprocess_fns': [],
         'clip_denoised': False,
         'use_padding': False,
-        'use_actions': True,
+        'use_actions': False,
         'max_path_length': 100,
 
         ## serialization
@@ -48,15 +48,15 @@ base = {
         'exp_name': watch(args_to_watch),
 
         ## training
-        'n_steps_per_epoch': 1000,  # 10000
+        'n_steps_per_epoch': 10000,  # 10000
         'loss_type': 'l2',
-        'n_train_steps': 1e5,       # 1e6
+        'n_train_steps': 1e6,       # 1e6
         'batch_size': 32,            # 32
         'learning_rate': 2e-5,      # 2e-4
         'gradient_accumulate_every': 2,
         'ema_decay': 0.995,
         'train_test_split': 0.9,
-        'save_freq': 10000,
+        'save_freq': 5e4,
         'sample_freq': 20000,
         'n_saves': 5,
         'save_parallel': False,
@@ -84,7 +84,7 @@ base = {
         'normalizer': 'LimitsNormalizer',     # 'GaussianNormalizer'
         'preprocess_fns': [],
         'use_padding': False,
-        'use_actions': True,
+        'use_actions': False,
         'max_path_length': 100,
 
         ## serialization
@@ -93,15 +93,15 @@ base = {
         'exp_name': watch(args_to_watch),
 
         ## training
-        'n_steps_per_epoch': 1000,  # 10000
+        'n_steps_per_epoch': 10000,  # 10000
         'loss_type': 'value_l2',
-        'n_train_steps': 1e5,       # 200e3
+        'n_train_steps': 1e6,       # 200e3
         'batch_size': 32,            # 32
         'learning_rate': 2e-5,      # 2e-4
         'gradient_accumulate_every': 2,
         'ema_decay': 0.995,
         'train_test_split': 0.9,
-        'save_freq': 10000,
+        'save_freq': 5e4,
         'sample_freq': 0,
         'n_saves': 5,
         'save_parallel': False,
@@ -114,7 +114,7 @@ base = {
     'plan': {
         'guide': 'sampling.ValueGuide',
         'policy': 'sampling.GuidedPolicy',
-        'max_episode_length': 1000,
+        'max_episode_length': 100,
         'batch_size': 64,
         'preprocess_fns': [],
         'device': 'cuda',
@@ -135,7 +135,7 @@ base = {
         'max_render': 8,
 
         ## Dataset
-        'use_actions': True,
+        'use_actions': False,
 
         ## diffusion model
         'horizon': 16,

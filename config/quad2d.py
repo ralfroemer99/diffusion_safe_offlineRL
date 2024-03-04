@@ -23,7 +23,7 @@ base = {
         ## model
         'model': 'models.TemporalUnet',
         'diffusion': 'models.GaussianDiffusion',
-        'horizon': 16,
+        'horizon': 32,
         'n_diffusion_steps': 20,
         'action_weight': 1,         # 10 
         'loss_weights': None,
@@ -48,15 +48,15 @@ base = {
         'exp_name': watch(args_to_watch),
 
         ## training
-        'n_steps_per_epoch': 1000,  # 10000
+        'n_steps_per_epoch': 10000,  # 10000
         'loss_type': 'l2',
-        'n_train_steps': 2e5,       # 1e6
+        'n_train_steps': 1e6,       # 1e6
         'batch_size': 32,            # 32
         'learning_rate': 2e-5,      # 2e-4
         'gradient_accumulate_every': 2,
         'ema_decay': 0.995,
         'train_test_split': 0.9,
-        'save_freq': 10000,
+        'save_freq': 5e4,
         'sample_freq': 20000,
         'n_saves': 5,
         'save_parallel': False,
@@ -69,7 +69,7 @@ base = {
     'values': {
         'model': 'models.ValueFunction',
         'diffusion': 'models.ValueDiffusion',
-        'horizon': 16,
+        'horizon': 32,
         'n_diffusion_steps': 20,
         'dim_mults': (1, 2, 4, 8),
         # 'renderer': 'utils.MuJoCoRenderer',
@@ -93,15 +93,15 @@ base = {
         'exp_name': watch(args_to_watch),
 
         ## training
-        'n_steps_per_epoch': 1000,  # 10000
+        'n_steps_per_epoch': 10000,  # 10000
         'loss_type': 'value_l2',
-        'n_train_steps': 2e5,       # 200e3
+        'n_train_steps': 1e6,       # 200e3
         'batch_size': 32,            # 32
         'learning_rate': 2e-5,      # 2e-4
         'gradient_accumulate_every': 2,
         'ema_decay': 0.995,
         'train_test_split': 0.9,
-        'save_freq': 10000,
+        'save_freq': 5e4,
         'sample_freq': 0,
         'n_saves': 5,
         'save_parallel': False,
@@ -122,7 +122,7 @@ base = {
 
         ## sample_kwargs
         'n_guide_steps': 2,
-        'scale': 1,
+        'scale': 100,
         't_stopgrad': 2,
         'scale_grad_by_std': True,
 
@@ -138,7 +138,7 @@ base = {
         'use_actions': True,
 
         ## diffusion model
-        'horizon': 16,
+        'horizon': 32,
         'n_diffusion_steps': 20,
 
         ## value function

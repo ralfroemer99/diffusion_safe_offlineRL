@@ -13,7 +13,7 @@ class Quad2DEnv(core.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 15}
 
-    dt = 0.1
+    dt = 0.05
 
     MASS = 0.1      # [kg]  Mass of the quadrotor
     LENGTH = 0.1    # [m]   Length of the effective moment arm of the propellers
@@ -307,7 +307,7 @@ class Quad2DEnv(core.Env):
                 if done:
                     break
             
-            if len(dataset_episode['rewards']) < 16:
+            if len(dataset_episode['rewards']) < 32:
                 continue
             
             episode += 1

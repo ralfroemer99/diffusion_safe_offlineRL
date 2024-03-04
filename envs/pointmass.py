@@ -35,7 +35,7 @@ class PointMassEnv(core.Env):
 
     def __init__(self, target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
                  reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True, 
-                 n_moving_obstacles=0, n_static_obstacles=0):
+                 n_moving_obstacles=0, n_static_obstacles=0, reward='squared_distance'):
         self.screen = None
         self.clock = None
         self.isopen = True
@@ -79,6 +79,7 @@ class PointMassEnv(core.Env):
         self.epsilon = epsilon
         self.reset_target_reached = reset_target_reached
         self.reset_out_of_bounds = reset_out_of_bounds
+        self.reward = reward
         self.bonus_reward = bonus_reward
         self.initial_state = initial_state
         self.n_moving_obstacles = n_moving_obstacles
@@ -359,7 +360,7 @@ class PointMassEnv(core.Env):
 
     def _get_reward(self):
         distance = self._get_distance_to_target()
-        reward = -distance ** 2
+        reward = -distance ** 2 if self.reward == 'squared_distance' else -distance
         # reward = -distance
         if distance <= self.epsilon:
             if self.bonus_reward:

@@ -182,8 +182,8 @@ def apply_projection(x, unsafe_bounds, action_dim):
                     pos_min = bound[dims, 0]
                     pos_max = bound[dims, 1]
 
-                    # pos = project_out(pos, pos_min, pos_max)
-                    x[_, t, action_dim+dims] = pos
+                    pos = project_out(pos, pos_min, pos_max)
+                    # x[_, t, action_dim+dims] = pos
         
     return x
 

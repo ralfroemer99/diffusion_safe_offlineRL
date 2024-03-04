@@ -82,7 +82,7 @@ batch_size = 100
 
 if which_experiments[0]:
     env = PointMassEnv(target=None, max_steps=20, initial_state=None, 
-                    epsilon=0.2, reset_target_reached=False, bonus_reward=True, 
+                    epsilon=0.2, reset_target_reached=False, bonus_reward=False, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
     fig, ax = plt.subplots(10, 10)
@@ -113,7 +113,7 @@ if which_experiments[0]:
 
 if which_experiments[1]:
     env = PointMassEnv(target=[-1, 2], max_steps=20, initial_state=[0, 0, 0, 0], 
-                       epsilon=0.2, reset_target_reached=False, bonus_reward=True, 
+                       epsilon=0.2, reset_target_reached=False, bonus_reward=False, 
                        reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
     obs = env.reset()
@@ -158,7 +158,7 @@ if which_experiments[2]:
     batch_size = 1
 
     env = PointMassEnv(target=None, max_steps=100, initial_state=None, 
-                    epsilon=0.2, reset_target_reached=True, bonus_reward=True, 
+                    epsilon=0.2, reset_target_reached=True, bonus_reward=False, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
     n_trials = 10
@@ -239,19 +239,20 @@ if which_experiments[2]:
     plt.show()
 
 #-----------------------------------------------------------------------------#
-#-----------------Closed-loop experiment without obstacles--------------------#
+#-----------------Closed-loop experiment with obstacles-----------------------#
 #-----------------------------------------------------------------------------#
 if which_experiments[3]:
     batch_size = 10
 
     env = PointMassEnv(target=None, max_steps=100, initial_state=None, epsilon=0.5, reset_target_reached=True, 
-                       bonus_reward=True, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
+                       bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
                        n_moving_obstacles=0, n_static_obstacles=10)
 
-    n_trials = 10
+    n_trials = 100
     fig, ax = plt.subplots(min(n_trials, 5), 7)
     n_reached = 0
     mean_steps = 0
+    reward_total = 0
     for n in range(n_trials):
         # Reset environment
         obs = env.reset(seed=n)
@@ -267,10 +268,7 @@ if which_experiments[3]:
             
             # Sample state sequence or state-action sequence
             unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon)
-            start_time = time.time()
             action, samples = policy(conditions=conditions, batch_size=batch_size, unsafe_bounds=unsafe_bounds, verbose=False)
-            print(f'Action computation took: {time.time() - start_time}')
-            # action_unsafe, samples_unsafe = policy(conditions=conditions, batch_size=batch_size, verbose=False)
             if _ == 0:
                 observations_ol = samples.observations
                 actions_ol = samples.actions if args.use_actions else None
@@ -279,9 +277,12 @@ if which_experiments[3]:
 
             # Step environment
 
-            if args.use_actions:
+            if not args.use_actions:
+                next_obs = samples.observations[0, 1, :]
+                action = env.inverse_dynamics(next_obs)
                 # action = env.sample_action()
-                obs, reward, done, target_reached = env.step(action)
+            
+            obs, reward, done, target_reached = env.step(action)
 
             # Log
             if _ < env.max_steps - 1:
@@ -292,10 +293,11 @@ if which_experiments[3]:
             if target_reached == True:
                 n_reached += 1
                 mean_steps += _ + 1
-                print(f'Env {n}: REACHED in {_} steps, current success rate: {n_reached / (n + 1) * 100}%')
+                reward_total += (rewards_cl * np.power(args.discount, np.arange(len(rewards_cl)))).sum()
+                # print(f'Env {n}: REACHED in {_} steps, current success rate: {n_reached / (n + 1) * 100}%')
 
-            if target_reached == -1:
-                print(f'Env {n}: COLLISION in {_} steps')
+            # if target_reached == -1:
+            #     print(f'Env {n}: COLLISION in {_} steps')
 
             if done:
                 observations_cl = observations_cl[:_ + 1, :]
@@ -327,9 +329,9 @@ if which_experiments[3]:
             for _ in range(6):
                 ax_cur[_].set_ylabel(labels[_])
     if n_reached > 0:
-        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}')
+        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}, mean reward: {reward_total / n_reached}')
+        print(f'Use actions: {args.use_actions}, scale: {args.scale}')
     else:
         print(f'Goal not reached in any of the {n_trials} cases')
-    print(f'Scale: {args.scale}')
 
     plt.show()
