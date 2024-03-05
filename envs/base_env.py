@@ -446,10 +446,9 @@ class PointMassEnv(core.Env):
         pygame.draw.circle(self.surf, (0, 0, 0), (int(scale * self.target[0] + offset), int(scale * self.target[1] + offset)), int(scale * 0.1))
 
         # Plot the obstacles as squares
-        if self.n_obstacles > 0:
-            for obstacle in self.obstacles:
-                left, top = int(scale * (obstacle['x'] - obstacle['d'] / 2) + offset), int(scale * (obstacle['y'] - obstacle['d'] / 2) + offset)
-                pygame.draw.rect(self.surf, (64, 255, 64), pygame.Rect(left, top, scale * obstacle['d'], scale * obstacle['d']))
+        for obstacle in self.obstacles:
+            left, top = int(scale * (obstacle['x'] - obstacle['d'] / 2) + offset), int(scale * (obstacle['y'] - obstacle['d'] / 2) + offset)
+            pygame.draw.rect(self.surf, (64, 255, 64), pygame.Rect(left, top, scale * obstacle['d'], scale * obstacle['d']))
 
         # Plot the trajectories
         if trajectories_to_plot is not None:

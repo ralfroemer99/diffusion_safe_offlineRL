@@ -39,7 +39,7 @@ base = {
         'preprocess_fns': [],
         'clip_denoised': False,
         'use_padding': False,
-        'use_actions': True,
+        'use_actions': False,
         'max_path_length': 100,
 
         ## serialization
@@ -84,7 +84,7 @@ base = {
         'normalizer': 'LimitsNormalizer',     # 'GaussianNormalizer'
         'preprocess_fns': [],
         'use_padding': False,
-        'use_actions': True,
+        'use_actions': False,
         'max_path_length': 100,
 
         ## serialization
@@ -122,7 +122,7 @@ base = {
 
         ## sample_kwargs
         'n_guide_steps': 2,
-        'scale': 100,
+        'scale': 1000,
         't_stopgrad': 2,
         'scale_grad_by_std': True,
 
@@ -148,8 +148,8 @@ base = {
         'diffusion_loadpath': 'f:diffusion/defaults_H{horizon}_T{n_diffusion_steps}_A{use_actions}',
         'value_loadpath': 'f:values/defaults_H{horizon}_T{n_diffusion_steps}_A{use_actions}_d{discount}',
 
-        'diffusion_epoch': 'latest',      # 'latest'
-        'value_epoch': 'latest',          # 'latest'
+        'diffusion_epoch': 'best',      # 'latest'
+        'value_epoch': 'best',          # 'latest'
 
         'verbose': False,
         'suffix': '0',

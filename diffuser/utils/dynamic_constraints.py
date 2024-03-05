@@ -6,6 +6,10 @@ def compute_unsafe_regions(obstacles, horizon=2, obs_dim=6):
         Returns a dictionary with the unsafe regions for each time step.
         Format: {time_step: [unsafe_region_1, unsafe_region_2, ...]}, where unsafe_region_i is a obs_dim x 2 array with the bounds of the unsafe region.
     """
+    
+    if obstacles is None:
+        return None
+
     unsafe_regions = {}
     for i in range(horizon):
         unsafe_regions[i] = []

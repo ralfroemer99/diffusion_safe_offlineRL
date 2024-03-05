@@ -31,7 +31,7 @@ class Quad2DEnv(core.Env):
 
     torque_noise_max = 0.0
 
-    SCREEN_DIM = 500
+    SCREEN_DIM = 1500
 
     #: use dynamics equations from the nips paper or the book
     # state = [x, dx, y, dy, theta, dtheta]
@@ -40,7 +40,8 @@ class Quad2DEnv(core.Env):
 
     def __init__(self, min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, g=9.81, 
                  target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
-                 reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True):
+                 reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True,
+                 n_moving_obstacles=0, n_static_obstacles=0, reward='squared_distance', test=False):
         self.screen = None
         self.clock = None
         self.isopen = True
@@ -93,13 +94,13 @@ class Quad2DEnv(core.Env):
         self.epsilon = epsilon
         self.reset_target_reached = reset_target_reached
         self.reset_out_of_bounds = reset_out_of_bounds
+        self.reward = reward
         self.bonus_reward = bonus_reward
         self.initial_state = initial_state
-        
-
-    # def h(self, x, y):
-    #     a = np.linalg.norm(np.array([x, y] - np.array([self.x0, self.y0]))) - np.square(self.r)
-    #     return a
+        self.n_moving_obstacles = n_moving_obstacles
+        self.n_static_obstacles = n_static_obstacles
+        self.n_obstacles = n_moving_obstacles + n_static_obstacles
+        self.test = test
 
     def reset(
         self,
@@ -109,14 +110,20 @@ class Quad2DEnv(core.Env):
         options: Optional[dict] = None
     ):
         super().reset(seed=seed)
+
+        if self.n_obstacles > 0:
+            self._generate_obstacles()
+
         is_valid = False
         if not self.random_target:
             self.state = self.initial_state
         else:
             while not is_valid:
                 self.state = self.state_space.sample()
-                # self.state = self.np_random.uniform(low=-np.pi, high=np.pi, size=(4,)).astype(np.float32)
-                is_valid = self._check_initial_pos(self.state)
+                if self.test:
+                    self.state[[1, 3, 4, 5]] = 0        # Drone starts in a hovering state
+                is_valid = self._check_initial_pos(self.state) and self._check_initial_vel(self.state)
+                is_valid = is_valid and self._check_initial_orientation(self.state) if self.test else is_valid
         self.timestep = 0
         if self.random_target:
             is_valid = False
@@ -124,16 +131,15 @@ class Quad2DEnv(core.Env):
                 self.target = self._sample_target()
                 is_valid = self._check_target(self.target)
         self.target_reached = False
+
         if not return_info:
             return self._get_ob()
         else:
             return self._get_ob(), {}
 
     def _sample_target(self):
-        # Random x target position in [-self.MAX_X, self.MAX_X]
+        # Random x/y target position in [-self.MAX_X/Y, self.MAX_X/Y]
         x = 2 * self.MAX_X * (self.np_random.rand() - 0.5)
-
-        # Random y target position in [-self.MAX_Y, self.MAX_Y]
         y = 2 * self.MAX_Y * (self.np_random.rand() - 0.5)
 
         return (x, y)
@@ -148,7 +154,49 @@ class Quad2DEnv(core.Env):
         return True
 
     def _check_initial_pos(self, state):
+        if self.target is not None:
+            p = self._get_coordinates(state)
+            distance = np.linalg.norm(np.array(p) - np.array(self.target))
+            if distance <= self.epsilon:
+                return False
         return True
+    
+    def _check_initial_vel(self, state):
+        max_acc = (self.max_thrust * 2 - self.MASS * self.GRAVITY) / self.MASS
+        # Ensure that the agent can avoid going out of bounds with maximum acceleration
+        if (state[1] > 0) & (state[0] + 0.5 * state[1] ** 2 / max_acc > self.MAX_X) or \
+            (state[1] < 0) & (state[0] - 0.5 * state[1] ** 2 / max_acc < -self.MAX_X) or \
+            (state[3] > 0) & (state[2] + 0.5 * state[3] ** 2 / max_acc > self.MAX_Y) or \
+            (state[3] < 0) & (state[2] - 0.5 * state[3] ** 2 / max_acc < -self.MAX_Y):
+            return False
+        return True   
+    
+    def _check_initial_orientation(self, state):
+        if state[4] > pi/2 or state[4] < -pi/2:
+            return False
+        return True
+
+    def _generate_obstacles(self):
+        self.obstacles = []
+
+        for _ in range(self.n_moving_obstacles):
+            d = 0.2 + self.np_random.rand() * (1 - 0.2)         # Create a square obstacle with a random initial position and velocity
+
+            x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)    # Random x/y initial position in [-self.MAX_X/Y + d/2, self.MAX_X/Y - d/2]
+            y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+
+            vx = 2 * self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-self.MAX_VEL_X/Y, self.MAX_VEL_X/Y]
+            vy = 2 * self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+
+            self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d})
+
+        for _ in range(self.n_static_obstacles):
+            d = 0.2 + self.np_random.rand() * (1 - 0.2)
+
+            x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
+            y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+
+            self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'd': d})
 
     def step(self, a):
         s = self.state
@@ -179,6 +227,20 @@ class Quad2DEnv(core.Env):
         self.prev_state = self.state
         self.state = ns
 
+        # Move obstacles
+        if self.n_moving_obstacles > 0:
+            for i in range(self.n_moving_obstacles):
+                obstacle = self.obstacles[i]
+                possible_new_x = obstacle['x'] + obstacle['vx'] * self.dt
+                possible_new_y = obstacle['y'] + obstacle['vy'] * self.dt
+                if possible_new_x <= -self.MAX_X + obstacle['d'] / 2 or possible_new_x >= self.MAX_X - obstacle['d'] / 2:
+                    obstacle['vx'] *= -1
+                if possible_new_y <= -self.MAX_Y + obstacle['d'] / 2 or possible_new_y >= self.MAX_Y - obstacle['d'] / 2:
+                    obstacle['vy'] *= -1
+
+                obstacle['x'] += obstacle['vx'] * self.dt
+                obstacle['y'] += obstacle['vy'] * self.dt
+
         done = self._is_done()
         reward = self._get_reward()
 
@@ -191,65 +253,8 @@ class Quad2DEnv(core.Env):
             a[1] = a[0] + self.np_random.uniform(-self.max_thrust_difference, self.max_thrust_difference)
             while a[1] < self.min_thrust or a[1] > self.max_thrust:
                 a[1] = a[0] + self.np_random.uniform(-self.max_thrust_difference, self.max_thrust_difference)
-            # a[1] = np.clip(a[1], a[0] - self.max_thrust_difference, a[0] + self.max_thrust_difference)
         return a
-
-    def _get_ob(self):
-        s = self.state
-        assert s is not None, "Call reset before using AcrobotEnv object."
-        if self.theta_as_sine_cosine:
-            return np.array(
-                [s[0], s[1], s[2], s[3], sin(s[4]), cos(s[4]), s[5], self.target[0], self.target[1]], dtype=np.float32
-            )
-        else:
-            return np.array(
-                [s[0], s[1], s[2], s[3], s[4], s[5], self.target[0], self.target[1]], dtype=np.float32
-            )
-
-    def _get_coordinates(self, state):
-        p = [state[0], state[2]]
-        return p
-
-    def _get_distance_to_target(self):
-        p = self._get_coordinates(self.state)
-        distance = np.linalg.norm(np.array(p) - np.array(self.target))
-        # print("=======")
-        # print("distance", distance)
-        # if distance <= self.epsilon:
-        #     print("target reached!")
-        return distance
-
-    def _get_reward(self):
-        distance = self._get_distance_to_target()
-        reward = -distance ** 2
-        if distance <= self.epsilon:
-            if self.bonus_reward:
-                reward += 1000.0
-        return reward
-
-    def _is_done(self):   
-        if self.reset_target_reached:
-            distance = self._get_distance_to_target()
-            if distance <= self.epsilon:
-                self.target_reached = True
-                return True
-        
-        if self.reset_out_of_bounds:
-            if self.state[0] <= -self.MAX_X + 1e-4 or self.state[0] >= self.MAX_X - 1e-4 or \
-                self.state[1] <= -self.MAX_VEL_X + 1e-4 or self.state[1] >= self.MAX_VEL_X - 1e-4 or \
-                self.state[2] <= -self.MAX_Y + 1e-4 or self.state[2] >= self.MAX_Y - 1e-4 or \
-                self.state[3] <= -self.MAX_VEL_Y + 1e-4 or self.state[3] >= self.MAX_VEL_Y - 1e-4 or \
-                self.state[5] <= -self.MAX_VEL_ANG + 1e-4 or self.state[5] >= self.MAX_VEL_ANG - 1e-4:
-                # self.state[4] <= -self.MAX_ANG + 1e-4 or self.state[4] >= self.MAX_ANG - 1e-4 or \
-                # print("Out of bounds!!!")
-                return True
-
-        if self.timestep == self.max_steps - 1:
-            # print("Timeout!!!")
-            return True
-        
-        return False
-
+    
     def inverse_dynamics(self, s_next):
         # Get parameters
         m = self.MASS
@@ -279,7 +284,44 @@ class Quad2DEnv(core.Env):
 
         return (a1, a2)
 
+    def get_obstacles(self):
+        return self.obstacles if self.n_obstacles > 0 else None
+    
+    def predict_obstacles(self, horizon):
+        '''
+            Predict the future positions of the moving obstacles for the given horizon.
+            return {0: [{'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d}, ...], 1: [...], ..., horizon: [...]}
+        '''
 
+        if self.n_obstacles == 0:
+            return None
+
+        predictions = {}
+        for i in range(horizon):
+            predictions[i] = []
+            for j in range(self.n_obstacles):       
+                if i == 0:
+                    predictions[i].append({'x': self.obstacles[j]['x'], 'y': self.obstacles[j]['y'], 'vx': self.obstacles[j]['vx'], 'vy': self.obstacles[j]['vy'], 'd': self.obstacles[j]['d']})
+                    continue
+                
+                x = predictions[i - 1][j]['x']
+                y = predictions[i - 1][j]['y']
+
+                vx = predictions[i - 1][j]['vx']
+                vy = predictions[i - 1][j]['vy']
+                
+                possible_x = x + vx * self.dt
+                possible_y = y + vy * self.dt
+
+                if possible_x <= -self.MAX_X + self.obstacles[j]['d'] / 2 or possible_x >= self.MAX_X - self.obstacles[j]['d'] / 2:
+                    vx *= -1
+                if possible_y <= -self.MAX_Y + self.obstacles[j]['d'] / 2 or possible_y >= self.MAX_Y - self.obstacles[j]['d'] / 2:
+                    vy *= -1
+
+                predictions[i].append({'x': x + vx * self.dt, 'y': y + vy * self.dt, 'vx': vx, 'vy': vy, 'd': self.obstacles[j]['d']})
+
+        return predictions
+    
     def make_dataset(self):
         dataset = {}
         keys = ['observations', 'actions', 'rewards', 'terminals', 'timeouts']
@@ -307,7 +349,7 @@ class Quad2DEnv(core.Env):
                 if done:
                     break
             
-            if len(dataset_episode['rewards']) < 32:
+            if len(dataset_episode['rewards']) < 16:
                 continue
             
             episode += 1
@@ -341,6 +383,73 @@ class Quad2DEnv(core.Env):
 
         return dataset
 
+    def _get_ob(self):
+        s = self.state
+        assert s is not None, "Call reset before using AcrobotEnv object."
+        if self.theta_as_sine_cosine:
+            return np.array(
+                [s[0], s[1], s[2], s[3], sin(s[4]), cos(s[4]), s[5], self.target[0], self.target[1]], dtype=np.float32
+            )
+        else:
+            return np.array(
+                [s[0], s[1], s[2], s[3], s[4], s[5], self.target[0], self.target[1]], dtype=np.float32
+            )
+
+    def _get_coordinates(self, state):
+        p = [state[0], state[2]]
+        return p
+
+    def _get_distance_to_target(self):
+        p = self._get_coordinates(self.state)
+        distance = np.linalg.norm(np.array(p) - np.array(self.target))
+        return distance
+
+    def _get_reward(self):
+        distance = self._get_distance_to_target()
+        reward = -distance ** 2
+        if distance <= self.epsilon:
+            if self.bonus_reward:
+                reward += 1000.0
+        return reward
+
+    def _is_done(self):   
+        if self.reset_target_reached:
+            distance = self._get_distance_to_target()
+            if distance <= self.epsilon:
+                self.target_reached = True
+                return True
+        
+        if self.reset_out_of_bounds:
+            if not self.test:
+                if self.state[0] <= -self.MAX_X + 1e-4 or self.state[0] >= self.MAX_X - 1e-4 or \
+                    self.state[1] <= -self.MAX_VEL_X + 1e-4 or self.state[1] >= self.MAX_VEL_X - 1e-4 or \
+                    self.state[2] <= -self.MAX_Y + 1e-4 or self.state[2] >= self.MAX_Y - 1e-4 or \
+                    self.state[3] <= -self.MAX_VEL_Y + 1e-4 or self.state[3] >= self.MAX_VEL_Y - 1e-4 or \
+                    self.state[5] <= -self.MAX_VEL_ANG + 1e-4 or self.state[5] >= self.MAX_VEL_ANG - 1e-4:
+                    return True
+            else:
+                if self.state[0] <= -self.MAX_X + 1e-4 or self.state[0] >= self.MAX_X - 1e-4 or \
+                    self.state[2] <= -self.MAX_Y + 1e-4 or self.state[2] >= self.MAX_Y - 1e-4:
+                    return True
+
+            
+        if self.n_obstacles > 0:
+            for i in range(self.n_obstacles):
+                obstacle = self.obstacles[i]
+                if self.state[0] >= obstacle['x'] - obstacle['d'] / 2 and \
+                    self.state[0] <= obstacle['x'] + obstacle['d'] / 2 and \
+                    self.state[2] >= obstacle['y'] - obstacle['d'] / 2 and \
+                    self.state[2] <= obstacle['y'] + obstacle['d'] / 2:
+                    # print("Collision!!!")
+                    self.target_reached = -1
+                    return True
+
+        if self.timestep == self.max_steps - 1:
+            # print("Timeout!!!")
+            return True
+        
+        return False
+
     def _dsdt(self, s_augmented):
         # Get parameters
         m = self.MASS
@@ -359,93 +468,66 @@ class Quad2DEnv(core.Env):
 
         return (dx, ddx, dy, ddy, dtheta, ddtheta, 0.0, 0.0)
 
-    # def render(self, mode="human"):
-    #     try:
-    #         import pygame
-    #         from pygame import gfxdraw
-    #     except ImportError:
-    #         raise DependencyNotInstalled(
-    #             "pygame is not installed, run `pip install gym[classic_control]`"
-    #         )
+    def render(self, trajectories_to_plot=None):
+        try:
+            import pygame
+        except ImportError:
+            raise DependencyNotInstalled(
+                "pygame is not installed, run `pip install gym[classic_control]`"
+            )
 
-    #     if self.screen is None:
-    #         pygame.init()
-    #         pygame.display.init()
-    #         self.screen = pygame.display.set_mode((self.SCREEN_DIM, self.SCREEN_DIM))
-    #     if self.clock is None:
-    #         self.clock = pygame.time.Clock()
+        if self.screen is None:
+            pygame.init()
+            pygame.display.init()
+            self.screen = pygame.display.set_mode((self.SCREEN_DIM, self.SCREEN_DIM))
+        if self.clock is None:
+            self.clock = pygame.time.Clock()
 
-    #     self.surf = pygame.Surface((self.SCREEN_DIM, self.SCREEN_DIM))
-    #     self.surf.fill((255, 255, 255))
-    #     s = self.state
+        self.surf = pygame.Surface((self.SCREEN_DIM, self.SCREEN_DIM))
+        self.surf.fill((255, 255, 255))
+        s = self.state
 
-    #     bound = self.LINK_LENGTH_1 + self.LINK_LENGTH_2 + 0.2  # 2.2 for default
-    #     scale = self.SCREEN_DIM / (bound * 2)
-    #     offset = self.SCREEN_DIM / 2
+        bound = self.MAX_X + 0.2
+        scale = self.SCREEN_DIM / (bound * 2)
+        offset = self.SCREEN_DIM / 2
 
-    #     if s is None:
-    #         return None
+        if s is None:
+            return None
 
-    #     safe_set = (scale * self.x0 + offset, scale * self.y0 + offset)
-    #     pygame.gfxdraw.filled_circle(self.surf, int(safe_set[0]), int(safe_set[1]), int(scale * self.r), (255, 64, 64)) # red
+        # Plot the quadrotor as a line
+        xc = int(scale * s[0] + offset)
+        yc = int(scale * s[2] + offset)
+        x1 = xc + int(scale * 0.2 * cos(s[4]))
+        y1 = yc + int(scale * 0.2 * sin(s[4]))
+        x2 = xc - int(scale * 0.2 * cos(s[4]))
+        y2 = yc - int(scale * 0.2 * sin(s[4]))
+        pygame.draw.line(self.surf, (255, 64, 64), (x1, y1), (x2, y2), int(scale * 0.1))
+        pygame.draw.line(self.surf, (255, 64, 64), (xc, yc), (xc - int(scale * 0.1 * sin(s[4])), yc + int(scale * 0.1 * cos(s[4]))), int(scale * 0.2))
 
-    #     p1 = [
-    #         -self.LINK_LENGTH_1 * cos(s[0]) * scale,
-    #         self.LINK_LENGTH_1 * sin(s[0]) * scale,
-    #     ]
+        # Plot the target position as a dot
+        pygame.draw.circle(self.surf, (0, 0, 0), (int(scale * self.target[0] + offset), int(scale * self.target[1] + offset)), int(scale * 0.1))
 
-    #     p2 = [
-    #         p1[0] - self.LINK_LENGTH_2 * cos(s[0] + s[1]) * scale,
-    #         p1[1] + self.LINK_LENGTH_2 * sin(s[0] + s[1]) * scale,
-    #     ]
+        # Plot the obstacles as squares
+        if self.n_obstacles > 0:
+            for obstacle in self.obstacles:
+                left, top = int(scale * (obstacle['x'] - obstacle['d'] / 2) + offset), int(scale * (obstacle['y'] - obstacle['d'] / 2) + offset)
+                pygame.draw.rect(self.surf, (64, 255, 64), pygame.Rect(left, top, scale * obstacle['d'], scale * obstacle['d']))
 
-    #     xys = np.array([[0, 0], p1, p2])[:, ::-1]
-    #     thetas = [s[0] - pi / 2, s[0] + s[1] - pi / 2]
-    #     link_lengths = [self.LINK_LENGTH_1 * scale, self.LINK_LENGTH_2 * scale]
+        # Plot the trajectories
+        if trajectories_to_plot is not None:
+            for _ in range(trajectories_to_plot.shape[0]):
+                traj = trajectories_to_plot[_]
+                traj = scale * traj + offset
+                pygame.draw.lines(self.surf, (64, 64, 255), False, list(map(tuple, traj.tolist())), 2)
+        
+        self.surf = pygame.transform.flip(self.surf, False, True)
+        self.screen.blit(self.surf, (0, 0))
+        
+        pygame.event.pump()
+        self.clock.tick(self.metadata["render_fps"])
+        pygame.display.flip()
 
-    #     for ((x, y), th, llen) in zip(xys, thetas, link_lengths):
-    #         x = x + offset
-    #         y = y + offset
-    #         l, r, t, b = 0, llen, 0.1 * scale, -0.1 * scale
-    #         coords = [(l, b), (l, t), (r, t), (r, b)]
-    #         transformed_coords = []
-    #         for coord in coords:
-    #             coord = pygame.math.Vector2(coord).rotate_rad(th)
-    #             coord = (coord[0] + x, coord[1] + y)
-    #             transformed_coords.append(coord)
-    #         gfxdraw.aapolygon(self.surf, transformed_coords, (0, 204, 204))
-    #         gfxdraw.filled_polygon(self.surf, transformed_coords, (0, 204, 204))
-
-    #         gfxdraw.aacircle(self.surf, int(x), int(y), int(0.1 * scale), (204, 204, 0))
-    #         gfxdraw.filled_circle(
-    #             self.surf, int(x), int(y), int(0.1 * scale), (204, 204, 0)
-    #         )
-
-    #     # drawing target position and initial position
-    #     target = (scale*self.target[1] + offset, scale * self.target[0] + offset)
-    #     pygame.gfxdraw.filled_circle(self.surf, int(target[0]), int(target[1]), 5, (0, 0, 255)) # blue
-
-    #     self.surf = pygame.transform.flip(self.surf, False, True)
-    #     self.screen.blit(self.surf, (0, 0))
-    #     if mode == "human":
-    #         pygame.event.pump()
-    #         self.clock.tick(self.metadata["render_fps"])
-    #         pygame.display.flip()
-
-    #     if mode == "rgb_array":
-    #         return np.transpose(
-    #             np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)
-    #         )
-    #     else:
-    #         return self.isopen
-
-    # def close(self):
-    #     if self.screen is not None:
-    #         import pygame
-
-    #         pygame.display.quit()
-    #         pygame.quit()
-    #         self.isopen = False
+        return self.isopen
 
 def wrap(x, m, M):
     """Wraps ``x`` so m <= x <= M; but unlike ``bound()`` which

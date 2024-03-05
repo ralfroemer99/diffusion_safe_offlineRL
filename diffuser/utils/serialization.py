@@ -34,7 +34,7 @@ def get_latest_epoch(loadpath):
 def load_config(*loadpath):
     loadpath = os.path.join(*loadpath)
     config = pickle.load(open(loadpath, 'rb'))
-    print(f'[ utils/serialization ] Loaded config from {loadpath}')
+    # print(f'[ utils/serialization ] Loaded config from {loadpath}')
     # print(config)
     return config
 
@@ -42,10 +42,10 @@ def load_losses(*loadpath):
     loadpath = os.path.join(*loadpath)
     if os.path.exists(loadpath):
         losses = pickle.load(open(loadpath, 'rb'))
-        print(f'[ utils/serialization ] Loaded losses from {loadpath}')
+        # print(f'[ utils/serialization ] Loaded losses from {loadpath}')
         return losses
     else:
-        print(f'[ utils/serialization ] File {loadpath} does not exist')
+        # print(f'[ utils/serialization ] File {loadpath} does not exist')
         return None
 
 def load_diffusion(*loadpath, epoch='latest', device='cuda:0', seed=None):
@@ -70,7 +70,7 @@ def load_diffusion(*loadpath, epoch='latest', device='cuda:0', seed=None):
     if epoch == 'latest':
         epoch = get_latest_epoch(loadpath)
 
-    print(f'\n[ utils/serialization ] Loading model epoch: {epoch}\n')
+    # print(f'\n[ utils/serialization ] Loading model epoch: {epoch}\n')
 
     trainer.load(epoch)
 

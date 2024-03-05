@@ -34,10 +34,10 @@ diffusion_losses = diffusion_experiment.losses
 value_losses = value_experiment.losses
 
 # Plot losses
-fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-utils.plot_losses(diffusion_losses, ax=ax[0], title='Diffusion losses')
-utils.plot_losses(value_losses, ax=ax[1], title='Value losses')
-plt.show()
+# fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+# utils.plot_losses(diffusion_losses, ax=ax[0], title='Diffusion losses')
+# utils.plot_losses(value_losses, ax=ax[1], title='Value losses')
+# plt.show()
 
 # utils.check_compatibility(diffusion_experiment, value_experiment)
 
@@ -69,7 +69,7 @@ policy = policy_config()
 #--------------------------------- main loop ---------------------------------#
 #-----------------------------------------------------------------------------#
 
-which_experiments = [1, 1, 0]
+which_experiments = [0, 0, 0, 1]
 # simulation_timesteps = 40
 labels = ['x', 'dx', 'y', 'dy', 'theta', 'dtheta', 'T1', 'T2', 'reward']
 
@@ -151,34 +151,15 @@ if which_experiments[1]:
         for _ in range(8):
             ax[i, _].set_ylabel(labels[_])
     
-    # Compute rollout and compare
-    # observations_ro = np.zeros_like(observations)
-    
-    # for i in range(batch_size):
-    #     obs = env.reset()
-    #     observations_ro[i, 0] = obs
-    #     for t in range(args.horizon - 1):
-    #         next_obs, reward, done, target_reached = env.step(actions[i, t])
-    #         observations_ro[i, t + 1] = next_obs
-        
-    # for i in range(batch_size):
-    #     ax[i, 0].plot(observations_ro[i, :, 0], 'r')  # x
-    #     ax[i, 1].plot(observations_ro[i, :, 2], 'r')  # y
-    #     ax[i, 2].plot(np.arctan2(observations_ro[i, :, 4], observations_ro[i, :, 5]), 'r')  # theta
-    #     ax[i, 3].plot(observations_ro[i, :, 1], 'r')  # dx
-    #     ax[i, 4].plot(observations_ro[i, :, 3], 'r')  # dy
-    #     ax[i, 5].plot(observations_ro[i, :, 6], 'r')  # dtheta
-    #     ax[i, 8].plot(observations_ro[i, :, 0], observations_ro[i, :, 2], 'r')   # trajectory
-    
     plt.show()
 
 #-----------------------------------------------------------------------------#
-#-----------------------------Closed-loop experiment--------------------------#
+#----------------Closed-loop experiment without obstacles---------------------#
 #-----------------------------------------------------------------------------#
 
 if which_experiments[2]:
     env = Quad2DEnv(min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, 
-                    target=None, max_steps=100, initial_state=None, 
+                    target=None, max_steps=200, initial_state=None, 
                     epsilon=0.5, reset_target_reached=False, bonus_reward=True, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
 
@@ -254,5 +235,102 @@ if which_experiments[2]:
                 ax_cur[_].set_ylabel(labels[_])
 
     print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%')
+
+    plt.show()
+
+#-----------------------------------------------------------------------------#
+#-----------------Closed-loop experiment with obstacles-----------------------#
+#-----------------------------------------------------------------------------#
+if which_experiments[3]:
+    batch_size = 10
+
+    env = Quad2DEnv(min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, target=None, max_steps=200, 
+                    initial_state=None, epsilon=0.5, reset_target_reached=True, bonus_reward=False, reset_out_of_bounds=True, 
+                    theta_as_sine_cosine=True, num_episodes=10, n_moving_obstacles=0, n_static_obstacles=0, test=True)
+
+    n_trials = 100
+    fig, ax = plt.subplots(min(n_trials, 5), 7)
+    n_reached = 0
+    mean_steps = 0
+    reward_total = 0
+    for n in range(n_trials):
+        # Reset environment
+        obs = env.reset(seed=n)
+        # print('Env %d, initial pos: %s, target: %s' % (n, [obs[0], obs[2]], env.target))
+
+        observations_cl = np.zeros((env.max_steps, 9))
+        observations_cl[0, :] = obs
+        actions_cl = np.zeros((env.max_steps, 2))
+        rewards_cl = np.zeros((env.max_steps))
+        for _ in range(env.max_steps - 1):           
+            # Get current state
+            conditions = {0: obs}
+            
+            # Sample state sequence or state-action sequence
+            unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon)
+            action, samples = policy(conditions=conditions, batch_size=batch_size, unsafe_bounds=None, verbose=False)
+            if _ == 0:
+                observations_ol = samples.observations
+                actions_ol = samples.actions if args.use_actions else None
+
+            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
+
+            # Step environment
+            if not args.use_actions:
+                next_obs = samples.observations[0, 1, :]
+                action = env.inverse_dynamics(next_obs)
+                # action = env.sample_action()
+            
+            obs, reward, done, target_reached = env.step(action)
+
+            # Log
+            if _ < env.max_steps - 1:
+                observations_cl[_ + 1, :] = obs
+            actions_cl[_, :] = action
+            rewards_cl[_] = reward
+
+            if target_reached == True:
+                n_reached += 1
+                mean_steps += _ + 1
+                reward_total += (rewards_cl * np.power(args.discount, np.arange(len(rewards_cl)))).sum()
+                # print(f'Env {n}: REACHED in {_} steps, current success rate: {n_reached / (n + 1) * 100}%')
+
+            # if target_reached == -1:
+            #     print(f'Env {n}: COLLISION in {_} steps')
+
+            if done:
+                observations_cl = observations_cl[:_ + 1, :]
+                actions_cl = actions_cl[:_ + 1, :]
+                rewards_cl = rewards_cl[:_ + 1]
+                break
+
+        # Plot closed-loop trajectories
+        if n < 5:
+            ax_cur = ax[n] if len(ax.shape) > 1 else ax
+            for i in range(4):
+                ax_cur[i].plot(observations_cl[:, i])
+                for j in range(min(batch_size, 5)):
+                    ax_cur[i].plot(observations_ol[j, :, i], 'r')
+            for i in range(2):
+                ax_cur[i + 4].plot(actions_cl[:, i])
+                if args.use_actions:
+                    for j in range(min(batch_size, 5)):
+                        ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
+            ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
+            ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
+            ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
+            for j in range(min(batch_size, 5)):
+                ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
+            ax_cur[6].set_xlim(-5, 5)
+            ax_cur[6].set_ylim(-5, 5)
+            ax_cur[6].legend()
+
+            for _ in range(6):
+                ax_cur[_].set_ylabel(labels[_])
+    if n_reached > 0:
+        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}, mean reward: {reward_total / n_reached}')
+        print(f'Use actions: {args.use_actions}, scale: {args.scale}')
+    else:
+        print(f'Goal not reached in any of the {n_trials} cases')
 
     plt.show()
