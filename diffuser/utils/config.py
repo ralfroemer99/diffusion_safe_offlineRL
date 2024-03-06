@@ -15,7 +15,7 @@ def import_class(_class):
     module = importlib.import_module(f'{repo_name}.{module_name}')
     ## eg, diffusion.utils.Renderer
     _class = getattr(module, class_name)
-    print(f'[ utils/config ] Imported {repo_name}.{module_name}:{class_name}')
+    # print(f'[ utils/config ] Imported {repo_name}.{module_name}:{class_name}')
     return _class
 
 class Config(collections.Mapping):

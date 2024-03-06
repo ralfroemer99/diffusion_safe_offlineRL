@@ -46,7 +46,7 @@ class SequenceDataset(torch.utils.data.Dataset):
         self.get_goal_dim()
         self.normalize()
 
-        print(fields)
+        # print(fields)
         # shapes = {key: val.shape for key, val in self.fields.items()}
         # print(f'[ datasets/mujoco ] Dataset fields: {shapes}')
 
@@ -136,14 +136,14 @@ class ValueDataset(SequenceDataset):
             self.normed = True
 
     def _get_bounds(self):
-        print('[ datasets/sequence ] Getting value dataset bounds...', end=' ', flush=True)
+        # print('[ datasets/sequence ] Getting value dataset bounds...', end=' ', flush=True)
         vmin = np.inf
         vmax = -np.inf
         for i in range(len(self.indices)):
             value = self.__getitem__(i).values.item()
             vmin = min(value, vmin)
             vmax = max(value, vmax)
-        print('✓')
+        # print('✓')
         return vmin, vmax
 
     def normalize_value(self, value):

@@ -178,12 +178,12 @@ def apply_projection(x, unsafe_bounds, action_dim):
             # If it is, project it to the boundary of the unsafe set
             if mask.any():
                 for _ in torch.where(mask)[0]:
-                    pos = x[_, t, action_dim+dims]
-                    pos_min = bound[dims, 0]
-                    pos_max = bound[dims, 1]
+                    proj = x[_, t, action_dim+dims].clone()
+                    proj_min = bound[dims, 0]
+                    proj_max = bound[dims, 1]
 
-                    pos = project_out(pos, pos_min, pos_max)
-                    # x[_, t, action_dim+dims] = pos
+                    pos = project_out(proj, proj_min, proj_max)
+                    x[_, t, action_dim+dims] = pos.clone()
         
     return x
 

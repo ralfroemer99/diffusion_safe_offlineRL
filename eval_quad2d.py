@@ -249,7 +249,7 @@ if which_experiments[3]:
                     theta_as_sine_cosine=True, num_episodes=10, n_moving_obstacles=0, n_static_obstacles=0, test=True)
 
     n_trials = 100
-    fig, ax = plt.subplots(min(n_trials, 5), 7)
+    fig, ax = plt.subplots(min(n_trials, 5), 9)
     n_reached = 0
     mean_steps = 0
     reward_total = 0
@@ -273,7 +273,7 @@ if which_experiments[3]:
                 observations_ol = samples.observations
                 actions_ol = samples.actions if args.use_actions else None
 
-            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
+            # env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
 
             # Step environment
             if not args.use_actions:
@@ -292,7 +292,6 @@ if which_experiments[3]:
             if target_reached == True:
                 n_reached += 1
                 mean_steps += _ + 1
-                reward_total += (rewards_cl * np.power(args.discount, np.arange(len(rewards_cl)))).sum()
                 # print(f'Env {n}: REACHED in {_} steps, current success rate: {n_reached / (n + 1) * 100}%')
 
             # if target_reached == -1:
@@ -302,35 +301,43 @@ if which_experiments[3]:
                 observations_cl = observations_cl[:_ + 1, :]
                 actions_cl = actions_cl[:_ + 1, :]
                 rewards_cl = rewards_cl[:_ + 1]
+                reward_total += (rewards_cl * np.power(args.discount, np.arange(len(rewards_cl)))).sum()
                 break
 
         # Plot closed-loop trajectories
         if n < 5:
-            ax_cur = ax[n] if len(ax.shape) > 1 else ax
-            for i in range(4):
-                ax_cur[i].plot(observations_cl[:, i])
+            ax_cur = ax[n] if len(ax.shape) > 1 else ax            
+            for i in range(4):                          
+                ax_cur[i].plot(observations_cl[:, i])                        # x, dx, y, dy
                 for j in range(min(batch_size, 5)):
                     ax_cur[i].plot(observations_ol[j, :, i], 'r')
+            
+            ax_cur[4].plot(np.arctan2(observations_cl[:, 4], observations_cl[:, 5]))    # theta
+            ax_cur[5].plot(observations_cl[:, 6])                                       # dtheta
+            for j in range(min(batch_size, 5)):
+                ax_cur[4].plot(np.arctan2(observations_ol[j, :, 4], observations_ol[j, :, 5]), 'r')
+                ax_cur[5].plot(observations_ol[j, :, 6], 'r')
+            
             for i in range(2):
-                ax_cur[i + 4].plot(actions_cl[:, i])
+                ax_cur[i + 6].plot(actions_cl[:, i])
                 if args.use_actions:
                     for j in range(min(batch_size, 5)):
-                        ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
-            ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
-            ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
-            ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
+                        ax_cur[i + 6].plot(actions_ol[j, :, i], 'r')
+            ax_cur[8].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
+            ax_cur[8].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
+            ax_cur[8].plot(observations_cl[0, 7], observations_cl[0, 8], 'ro')  # goal
             for j in range(min(batch_size, 5)):
-                ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
-            ax_cur[6].set_xlim(-5, 5)
-            ax_cur[6].set_ylim(-5, 5)
-            ax_cur[6].legend()
+                ax_cur[8].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
+            ax_cur[8].set_xlim(-5, 5)
+            ax_cur[8].set_ylim(-5, 5)
+            ax_cur[8].legend()
 
-            for _ in range(6):
+            for _ in range(8):
                 ax_cur[_].set_ylabel(labels[_])
     if n_reached > 0:
-        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}, mean reward: {reward_total / n_reached}')
+        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}, mean reward: {reward_total / n_trials}')
         print(f'Use actions: {args.use_actions}, scale: {args.scale}')
     else:
         print(f'Goal not reached in any of the {n_trials} cases')
 
-    plt.show()
+    # plt.show()

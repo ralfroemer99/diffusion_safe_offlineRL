@@ -74,8 +74,6 @@ which_experiments = [0, 0, 0, 1]
 # simulation_timesteps = 40
 labels = ['x', 'dx', 'y', 'dy', 'u1', 'u2', 'reward']
 
-batch_size = 100
-
 #-----------------------------------------------------------------------------#
 #---------Sampled open-loop trajectories for many initial conditions----------#
 #-----------------------------------------------------------------------------#
@@ -96,7 +94,7 @@ if which_experiments[0]:
         conditions = {0: obs}
 
         # Sample open-loop plan
-        action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False) 
+        action, samples = policy(conditions=conditions, batch_size=args.batch_size, verbose=False) 
         observations = samples.observations
 
         ax[i // 10, i % 10].plot(observations[0, :, 0], observations[0, :, 2])
@@ -122,20 +120,20 @@ if which_experiments[1]:
     conditions = {0: obs}
 
     # Sample open-loop plan
-    action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False) 
+    action, samples = policy(conditions=conditions, batch_size=args.batch_size, verbose=False) 
     observations = samples.observations
     actions = samples.actions if args.use_actions else None
     right_direction_counter = 0
-    for i in range(batch_size):
+    for i in range(args.batch_size):
         if observations[i, -1, 0] < 0:
             right_direction_counter += 1
     print(f'Final x position has mean {observations[:, -1, 0].mean()}')
-    print(f'Right direction: {right_direction_counter / batch_size * 100}%')
+    print(f'Right direction: {right_direction_counter / args.batch_size * 100}%')
 
     # Plot open-loop plan
-    fig, ax = plt.subplots(min(batch_size, 10), 7)
+    fig, ax = plt.subplots(min(args.batch_size, 10), 7)
     fig.suptitle('Open-loop plan')
-    for i in range(min(batch_size, 10)):
+    for i in range(min(args.batch_size, 10)):
         for j in range(4):
             ax[i, j].plot(observations[i, :, j], 'b')
         if args.use_actions:
@@ -155,8 +153,6 @@ if which_experiments[1]:
 #-----------------------------------------------------------------------------#
 
 if which_experiments[2]:
-    batch_size = 1
-
     env = PointMassEnv(target=None, max_steps=100, initial_state=None, 
                     epsilon=0.2, reset_target_reached=True, bonus_reward=False, 
                     reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
@@ -179,7 +175,7 @@ if which_experiments[2]:
             conditions = {0: obs}
             
             # Sample state sequence or state-action sequence
-            action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False)
+            action, samples = policy(conditions=conditions, batch_size=args.batch_size, verbose=False)
             if _ == 0:
                 observations_ol = samples.observations
                 actions_ol = samples.actions if args.use_actions else None
@@ -211,17 +207,17 @@ if which_experiments[2]:
             ax_cur = ax[n] if len(ax.shape) > 1 else ax
             for i in range(4):
                 ax_cur[i].plot(observations_cl[:, i])
-                for j in range(min(batch_size, 5)):
+                for j in range(min(args.batch_size, 5)):
                     ax_cur[i].plot(observations_ol[j, :, i], 'r')
             for i in range(2):
                 ax_cur[i + 4].plot(actions_cl[:, i])
                 if args.use_actions:
-                    for j in range(min(batch_size, 5)):
+                    for j in range(min(args.batch_size, 5)):
                         ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
             ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
             ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
             ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
-            for j in range(min(batch_size, 5)):
+            for j in range(min(args.batch_size, 5)):
                 ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
             ax_cur[6].set_xlim(-5, 5)
             ax_cur[6].set_ylim(-5, 5)
@@ -242,11 +238,9 @@ if which_experiments[2]:
 #-----------------Closed-loop experiment with obstacles-----------------------#
 #-----------------------------------------------------------------------------#
 if which_experiments[3]:
-    batch_size = 10
-
     env = PointMassEnv(target=None, max_steps=100, initial_state=None, epsilon=0.5, reset_target_reached=True, 
                        bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
-                       n_moving_obstacles=0, n_static_obstacles=10)
+                       n_moving_obstacles=0, n_static_obstacles=0)
 
     n_trials = 100
     fig, ax = plt.subplots(min(n_trials, 5), 7)
@@ -268,12 +262,12 @@ if which_experiments[3]:
             
             # Sample state sequence or state-action sequence
             unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon)
-            action, samples = policy(conditions=conditions, batch_size=batch_size, unsafe_bounds=unsafe_bounds, verbose=False)
+            action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=None, verbose=False)
             if _ == 0:
                 observations_ol = samples.observations
                 actions_ol = samples.actions if args.use_actions else None
 
-            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
+            # env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
 
             # Step environment
 
@@ -293,7 +287,6 @@ if which_experiments[3]:
             if target_reached == True:
                 n_reached += 1
                 mean_steps += _ + 1
-                reward_total += (rewards_cl * np.power(args.discount, np.arange(len(rewards_cl)))).sum()
                 # print(f'Env {n}: REACHED in {_} steps, current success rate: {n_reached / (n + 1) * 100}%')
 
             # if target_reached == -1:
@@ -303,6 +296,7 @@ if which_experiments[3]:
                 observations_cl = observations_cl[:_ + 1, :]
                 actions_cl = actions_cl[:_ + 1, :]
                 rewards_cl = rewards_cl[:_ + 1]
+                reward_total += (rewards_cl * np.power(args.discount, np.arange(len(rewards_cl)))).sum()
                 break
 
         # Plot closed-loop trajectories
@@ -310,17 +304,17 @@ if which_experiments[3]:
             ax_cur = ax[n] if len(ax.shape) > 1 else ax
             for i in range(4):
                 ax_cur[i].plot(observations_cl[:, i])
-                for j in range(min(batch_size, 5)):
+                for j in range(min(args.batch_size, 5)):
                     ax_cur[i].plot(observations_ol[j, :, i], 'r')
             for i in range(2):
                 ax_cur[i + 4].plot(actions_cl[:, i])
                 if args.use_actions:
-                    for j in range(min(batch_size, 5)):
+                    for j in range(min(args.batch_size, 5)):
                         ax_cur[i + 4].plot(actions_ol[j, :, i], 'r')
             ax_cur[6].plot(observations_cl[:, 0], observations_cl[:, 2], label='Closed-loop')   # trajectory
             ax_cur[6].plot(observations_cl[0, 0], observations_cl[0, 2], 'go')  # start
             ax_cur[6].plot(observations_cl[0, 4], observations_cl[0, 5], 'ro')  # goal
-            for j in range(min(batch_size, 5)):
+            for j in range(min(args.batch_size, 5)):
                 ax_cur[6].plot(observations_ol[j, :, 0], observations_ol[j, :, 2], color='r')
             ax_cur[6].set_xlim(-5, 5)
             ax_cur[6].set_ylim(-5, 5)
@@ -329,9 +323,8 @@ if which_experiments[3]:
             for _ in range(6):
                 ax_cur[_].set_ylabel(labels[_])
     if n_reached > 0:
-        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}, mean reward: {reward_total / n_reached}')
-        print(f'Use actions: {args.use_actions}, scale: {args.scale}')
+        print(f'Goal reached in {n_reached} out of {n_trials} cases, success rate: {n_reached / n_trials * 100}%, mean steps: {mean_steps / n_reached}, mean reward: {reward_total / n_trials}')
     else:
         print(f'Goal not reached in any of the {n_trials} cases')
 
-    plt.show()
+    # plt.show()

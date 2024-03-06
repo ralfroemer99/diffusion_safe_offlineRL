@@ -502,7 +502,7 @@ class Quad2DEnv(core.Env):
         x2 = xc - int(scale * 0.2 * cos(s[4]))
         y2 = yc - int(scale * 0.2 * sin(s[4]))
         pygame.draw.line(self.surf, (255, 64, 64), (x1, y1), (x2, y2), int(scale * 0.1))
-        pygame.draw.line(self.surf, (255, 64, 64), (xc, yc), (xc - int(scale * 0.1 * sin(s[4])), yc + int(scale * 0.1 * cos(s[4]))), int(scale * 0.2))
+        pygame.draw.line(self.surf, (255, 64, 64), (xc, yc), (xc - int(scale * 0.2 * sin(s[4])), yc + int(scale * 0.2 * cos(s[4]))), int(scale * 0.1))
 
         # Plot the target position as a dot
         pygame.draw.circle(self.surf, (0, 0, 0), (int(scale * self.target[0] + offset), int(scale * self.target[1] + offset)), int(scale * 0.1))

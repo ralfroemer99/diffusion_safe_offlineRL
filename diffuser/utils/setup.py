@@ -43,7 +43,7 @@ class Parser(Tap):
 
     def save(self):
         fullpath = os.path.join(self.savepath, 'args.json')
-        print(f'[ utils/setup ] Saved args to {fullpath}')
+        # print(f'[ utils/setup ] Saved args to {fullpath}')
         super().save(fullpath, skip_unpicklable=True)
 
     def parse_args(self, experiment=None):
@@ -66,16 +66,16 @@ class Parser(Tap):
             Load parameters from config file
         '''
         dataset = args.dataset.replace('-', '_')
-        print(f'[ utils/setup ] Reading config: {args.config}:{dataset}')
+        # print(f'[ utils/setup ] Reading config: {args.config}:{dataset}')
         module = importlib.import_module(args.config)
         params = getattr(module, 'base')[experiment]
 
         if hasattr(module, dataset) and experiment in getattr(module, dataset):
-            print(f'[ utils/setup ] Using overrides | config: {args.config} | dataset: {dataset}')
+            # print(f'[ utils/setup ] Using overrides | config: {args.config} | dataset: {dataset}')
             overrides = getattr(module, dataset)[experiment]
             params.update(overrides)
-        else:
-            print(f'[ utils/setup ] Not using overrides | config: {args.config} | dataset: {dataset}')
+        # else:
+            # print(f'[ utils/setup ] Not using overrides | config: {args.config} | dataset: {dataset}')
 
         self._dict = {}
         for key, val in params.items():
@@ -92,7 +92,7 @@ class Parser(Tap):
         if not len(extras):
             return
 
-        print(f'[ utils/setup ] Found extras: {extras}')
+        # print(f'[ utils/setup ] Found extras: {extras}')
         assert len(extras) % 2 == 0, f'Found odd number ({len(extras)}) of extras: {extras}'
         for i in range(0, len(extras), 2):
             key = extras[i].replace('--', '')
@@ -100,7 +100,7 @@ class Parser(Tap):
             assert hasattr(args, key), f'[ utils/setup ] {key} not found in config: {args.config}'
             old_val = getattr(args, key)
             old_type = type(old_val)
-            print(f'[ utils/setup ] Overriding config | {key} : {old_val} --> {val}')
+            # print(f'[ utils/setup ] Overriding config | {key} : {old_val} --> {val}')
             if val == 'None':
                 val = None
             elif val == 'latest':
@@ -120,19 +120,19 @@ class Parser(Tap):
             if type(old) is str and old[:2] == 'f:':
                 val = old.replace('{', '{args.').replace('f:', '')
                 new = lazy_fstring(val, args)
-                print(f'[ utils/setup ] Lazy fstring | {key} : {old} --> {new}')
+                # print(f'[ utils/setup ] Lazy fstring | {key} : {old} --> {new}')
                 setattr(self, key, new)
                 self._dict[key] = new
 
     def set_seed(self, args):
         if not hasattr(args, 'seed') or args.seed is None:
             return
-        print(f'[ utils/setup ] Setting seed: {args.seed}')
+        # print(f'[ utils/setup ] Setting seed: {args.seed}')
         set_seed(args.seed)
 
     def set_loadbase(self, args):
         if hasattr(args, 'loadbase') and args.loadbase is None:
-            print(f'[ utils/setup ] Setting loadbase: {args.logbase}')
+            # print(f'[ utils/setup ] Setting loadbase: {args.logbase}')
             args.loadbase = args.logbase
 
     def generate_exp_name(self, args):
@@ -141,7 +141,7 @@ class Parser(Tap):
         exp_name = getattr(args, 'exp_name')
         if callable(exp_name):
             exp_name_string = exp_name(args)
-            print(f'[ utils/setup ] Setting exp_name to: {exp_name_string}')
+            # print(f'[ utils/setup ] Setting exp_name to: {exp_name_string}')
             setattr(args, 'exp_name', exp_name_string)
             self._dict['exp_name'] = exp_name_string
 

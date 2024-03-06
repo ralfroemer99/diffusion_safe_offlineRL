@@ -122,7 +122,7 @@ base = {
 
         ## sample_kwargs
         'n_guide_steps': 2,
-        'scale': 100,
+        'scale': 100.0,
         't_stopgrad': 2,
         'scale_grad_by_std': True,
 
@@ -135,7 +135,7 @@ base = {
         'max_render': 8,
 
         ## Dataset
-        'use_actions': False,
+        'use_actions': True,
 
         ## diffusion model
         'horizon': 16,

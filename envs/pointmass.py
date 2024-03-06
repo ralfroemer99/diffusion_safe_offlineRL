@@ -26,7 +26,7 @@ class PointMassEnv(core.Env):
 
     acc_noise_max = 0.0
 
-    SCREEN_DIM = 500
+    SCREEN_DIM = 1500
 
     #: use dynamics equations from the nips paper or the book
     # state = [x, dx, y, dy]
