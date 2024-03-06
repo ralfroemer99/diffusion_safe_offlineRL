@@ -78,6 +78,12 @@ class Quad2DEnv(core.Env):
         self.state = None
         self.g = g
 
+        self.n_moving_obstacles = n_moving_obstacles
+        self.n_static_obstacles = n_static_obstacles
+        self.n_obstacles = n_moving_obstacles + n_static_obstacles
+        if self.n_obstacles > 0:
+            self._generate_obstacles()
+
         if target:
             self.target = target
             self.random_target = False
@@ -97,9 +103,6 @@ class Quad2DEnv(core.Env):
         self.reward = reward
         self.bonus_reward = bonus_reward
         self.initial_state = initial_state
-        self.n_moving_obstacles = n_moving_obstacles
-        self.n_static_obstacles = n_static_obstacles
-        self.n_obstacles = n_moving_obstacles + n_static_obstacles
         self.test = test
 
     def reset(
@@ -151,14 +154,30 @@ class Quad2DEnv(core.Env):
             distance = np.linalg.norm(np.array(p) - np.array(target))
             if distance <= self.epsilon:
                 return False
+        if self.n_obstacles > 0:
+            for i in range(self.n_obstacles):
+                obstacle = self.obstacles[i]
+                if target[0] >= obstacle['x'] - obstacle['d'] / 2 and \
+                    target[0] <= obstacle['x'] + obstacle['d'] / 2 and \
+                    target[1] >= obstacle['y'] - obstacle['d'] / 2 and \
+                    target[1] <= obstacle['y'] + obstacle['d'] / 2:
+                    return False
         return True
 
     def _check_initial_pos(self, state):
+        p = self._get_coordinates(state)
         if self.target is not None:
-            p = self._get_coordinates(state)
             distance = np.linalg.norm(np.array(p) - np.array(self.target))
             if distance <= self.epsilon:
                 return False
+        if self.n_obstacles > 0:
+            for i in range(self.n_obstacles):
+                obstacle = self.obstacles[i]
+                if p[0] >= obstacle['x'] - obstacle['d'] / 2 and \
+                    p[0] <= obstacle['x'] + obstacle['d'] / 2 and \
+                    p[1] >= obstacle['y'] - obstacle['d'] / 2 and \
+                    p[1] <= obstacle['y'] + obstacle['d'] / 2:
+                    return False
         return True
     
     def _check_initial_vel(self, state):

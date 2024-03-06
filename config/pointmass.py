@@ -115,7 +115,7 @@ base = {
         'guide': 'sampling.ValueGuide',
         'policy': 'sampling.GuidedPolicy',
         'max_episode_length': 100,
-        'batch_size': 64,
+        'batch_size': 8,
         'preprocess_fns': [],
         'device': 'cuda',
         'seed': 0,
