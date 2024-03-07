@@ -13,16 +13,14 @@ from envs.pointmass import PointMassEnv
 save_path = 'results/with_without_actions'
 
 # List of arguments to pass to the script
-systems_list = ['pointmass']
-# n_obstacles_range = [[0, 0],
-#                      [0, 5],
-#                      [5, 5]]
-n_obstacles_range = [[0, 0]]
+systems_list = ['quad2d', 'pointmass']
+n_obstacles_range = [[0, 0],      # dynamic obstacles, static obstacles
+                     [0, 5],
+                     [3, 5]]
 with_actions_range = [True]         # Has no impact
-# with_projections_range = [False, True]
-with_projections_range = [False]
+with_projections_range = [False, True]
 
-n_trials = 20
+n_trials = 100
 
 for system in systems_list:
     # Store success rate and reward
@@ -63,8 +61,8 @@ for system in systems_list:
         guide_config = utils.Config(args.guide, model=value_function, verbose=False)
         guide = guide_config()
 
-        for idx1, n_obstacles in enumerate(n_obstacles_range):
-            for idx3, with_projections in enumerate(with_projections_range):
+        for idx3, with_projections in enumerate(with_projections_range):
+            for idx1, n_obstacles in enumerate(n_obstacles_range):
                 ## policies are wrappers around an unconditional diffusion model and a value guide
                 policy_config = utils.Config(
                     args.policy,
@@ -107,12 +105,12 @@ for system in systems_list:
                         
                         # Sample state sequence or state-action sequence
                         if with_projections:
-                            unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon)
+                            unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
                             action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=unsafe_bounds, verbose=False)
                         else:
                             action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=None, verbose=False)
 
-                        env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
+                        # env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]])
 
                         # Step environment
                         if not args.use_actions:
@@ -148,7 +146,7 @@ for system in systems_list:
     # print('-----------------------------------------------------------------------------------------------------------------')
     
     results = {'system': system,
-               'env': env,
+            #    'env': env,
                'use_actions': args.use_actions,
                'with_projections_range': with_projections_range,
                'with_actions_range': with_actions_range,
