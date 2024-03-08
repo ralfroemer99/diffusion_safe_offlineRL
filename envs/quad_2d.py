@@ -204,8 +204,8 @@ class Quad2DEnv(core.Env):
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)    # Random x/y initial position in [-self.MAX_X/Y + d/2, self.MAX_X/Y - d/2]
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
 
-            vx = 2 * self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-self.MAX_VEL_X/Y, self.MAX_VEL_X/Y]
-            vy = 2 * self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+            vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-self.MAX_VEL_X/Y, self.MAX_VEL_X/Y]
+            vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
 
             self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d})
 
