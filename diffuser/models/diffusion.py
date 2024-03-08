@@ -161,13 +161,22 @@ class GaussianDiffusion(nn.Module):
         device = self.betas.device
 
         batch_size = shape[0]
-        x = torch.randn(shape, device=device)
-        x = apply_conditioning(x, cond, self.action_dim, self.goal_dim, k=self.n_timesteps)
+        if cond.get('x_warmstart') is not None:
+            n_timesteps = cond['n_warmstart_steps'] if 'n_warmstart_steps' in cond else self.n_timesteps    
+            x = cond['x_warmstart']
+            t = make_timesteps(batch_size, n_timesteps, device)
+            x = self.q_sample(x_start=x, t=t)
+        else:
+            x = torch.randn(shape, device=device)       # Check if initial guess is given
+            n_timesteps = self.n_timesteps
+        x = apply_conditioning(x, cond, self.action_dim, self.goal_dim, k=n_timesteps-1)
 
         chain = [x] if return_chain else None
 
-        progress = utils.Progress(self.n_timesteps) if verbose else utils.Silent()
-        for i in reversed(range(0, self.n_timesteps)):
+        # progress = utils.Progress(self.n_timesteps) if verbose else utils.Silent()
+        # for i in reversed(range(0, self.n_timesteps)):
+        progress = utils.Progress(n_timesteps) if verbose else utils.Silent()
+        for i in reversed(range(0, n_timesteps)):
             t = make_timesteps(batch_size, i, device)
             x, values = sample_fn(self, x, cond, t, **sample_kwargs)
             x = apply_conditioning(x, cond, self.action_dim, self.goal_dim)

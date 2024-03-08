@@ -150,7 +150,7 @@ for idx0, with_projection in enumerate(with_projections):
             pickle.dump(results, f)
 
         command = 'ffmpeg -y -r ' + str(int(1/env.dt)) + ' -i ' + save_path + '/screen_%03d.png -vcodec libx264 -pix_fmt yuv420p ' + save_path + '/a_video.mp4'
-        subprocess.call(command, shell=True)
+        subprocess.call(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         # command = "ffmpeg -r 20 -f image2 -s 1500x1500 -i results/animation/pointmass/seed_0/screen_%03d.png -vcodec libx264 -crf 25  results/animation/pointmass/seed_0/video2.mp4"
         # subprocess.call(command, shell=True)
 

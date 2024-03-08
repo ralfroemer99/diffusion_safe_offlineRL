@@ -1,5 +1,6 @@
 data/*
 logs/*
+results/animation/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

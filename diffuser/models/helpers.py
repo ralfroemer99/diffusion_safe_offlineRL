@@ -143,7 +143,7 @@ def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
 def apply_conditioning(x, conditions, action_dim, goal_dim=0, k=1):
     # start_time = time.time()
     for t, val in conditions.items():
-        if t == 'unsafe_bounds' or t == 'dims':     # unsafe sets
+        if isinstance(t, str):     # unsafe sets
             continue
         if val.shape[-1] == x.shape[-1]:
             x[:, t, :] = val.clone()
@@ -153,7 +153,7 @@ def apply_conditioning(x, conditions, action_dim, goal_dim=0, k=1):
     if goal_dim > 0:
         x[:, :, -goal_dim:] = conditions[0][:, -goal_dim:].unsqueeze(1).clone()
     
-    if (k <= 10) and (conditions.get('unsafe_bounds') is not None):
+    if (k <= 20) and (conditions.get('unsafe_bounds') is not None):
         # print('Time to apply conditioning:', time.time() - start_time)
         # start_time = time.time()
         x = apply_projection(x, conditions['unsafe_bounds'], conditions['dims'], action_dim)
