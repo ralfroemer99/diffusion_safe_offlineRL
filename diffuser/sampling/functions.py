@@ -25,7 +25,7 @@ def n_step_guided_p_sample(
             grad[t < t_stopgrad] = 0
 
             x = x + scale * grad
-            x = apply_conditioning(x, cond, model.action_dim, model.goal_dim)
+            x = apply_conditioning(x, cond, model.action_dim, model.goal_dim, k=t[0])
 
     model_mean, _, model_log_variance = model.p_mean_variance(x=x, cond=cond, t=t)
 

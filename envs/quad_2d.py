@@ -41,7 +41,7 @@ class Quad2DEnv(core.Env):
     def __init__(self, min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, g=9.81, 
                  target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
                  reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True,
-                 n_moving_obstacles=0, n_static_obstacles=0, reward='squared_distance', test=False):
+                 n_moving_obstacles=0, n_static_obstacles=0, reward='squared_distance', test=False, seed=0):
         self.screen = None
         self.clock = None
         self.isopen = True
@@ -72,9 +72,9 @@ class Quad2DEnv(core.Env):
         action_high = np.array([self.max_thrust, self.max_thrust], dtype=np.float32)
         self.max_thrust_difference = max_rel_thrust_difference * self.MASS * self.GRAVITY
 
-        self.state_space = spaces.Box(low=state_low, high=state_high, dtype=np.float32)
-        self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float32)
-        self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32)
+        self.state_space = spaces.Box(low=state_low, high=state_high, dtype=np.float32, seed=seed)
+        self.observation_space = spaces.Box(low=obs_low, high=obs_high, dtype=np.float32, seed=seed)
+        self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32, seed=seed)
         self.state = None
         self.g = g
 
@@ -487,7 +487,7 @@ class Quad2DEnv(core.Env):
 
         return (dx, ddx, dy, ddy, dtheta, ddtheta, 0.0, 0.0)
 
-    def render(self, trajectories_to_plot=None):
+    def render(self, trajectories_to_plot=None, save_path=None):
         try:
             import pygame
         except ImportError:
@@ -537,7 +537,8 @@ class Quad2DEnv(core.Env):
             for _ in range(trajectories_to_plot.shape[0]):
                 traj = trajectories_to_plot[_]
                 traj = scale * traj + offset
-                pygame.draw.lines(self.surf, (64, 64, 255), False, list(map(tuple, traj.tolist())), 2)
+                color = (255, 64, 64) if _ == 0 else (64, 64, 255)
+                pygame.draw.lines(self.surf, color, False, list(map(tuple, traj.tolist())), 2)
         
         self.surf = pygame.transform.flip(self.surf, False, True)
         self.screen.blit(self.surf, (0, 0))
@@ -545,6 +546,10 @@ class Quad2DEnv(core.Env):
         pygame.event.pump()
         self.clock.tick(self.metadata["render_fps"])
         pygame.display.flip()
+
+        if save_path is not None:
+            file_name = save_path + "/screen_{:03d}.png".format(self.timestep)
+            pygame.image.save(self.surf, file_name)
 
         return self.isopen
 

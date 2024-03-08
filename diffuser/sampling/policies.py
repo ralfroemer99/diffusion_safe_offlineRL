@@ -25,10 +25,10 @@ class GuidedPolicy:
     def __call__(self, conditions, batch_size=1, unsafe_bounds=None, verbose=True):
         conditions = {k: self.preprocess_fn(v) for k, v in conditions.items()}
         conditions = self._format_conditions(conditions, batch_size)
-
         if unsafe_bounds is not None:
             unsafe_bounds = self._format_unsafe_bounds(unsafe_bounds)
             conditions.update({'unsafe_bounds': unsafe_bounds})
+            conditions.update({'dims': torch.tensor([2, 4])})
 
         ## run reverse diffusion process
         samples = self.diffusion_model(conditions, guide=self.guide, verbose=verbose, **self.sample_kwargs)
@@ -75,17 +75,19 @@ class GuidedPolicy:
         '''
             unsafe_bounds : dict of lists of obs_dim x 2 arrays
                 { t: [ [x_min, x_max], [y_min, y_max] ] }
-            unsafe_bounds_formatted : dict of obs_dim x (2 * n_obs) arrays
+            unsafe_bounds_formatted : dict of (action_dim + obs_dim) x (2 * n_obs) arrays
                 { t: [ x_min, x_max, y_min, y_max ] }
         '''
 
         unsafe_bounds_formatted = {}
         for i, _ in unsafe_bounds.items():
-            unsafe_bounds_formatted[i] = np.zeros((self.diffusion_model.observation_dim, 2 * len(unsafe_bounds[i])))
+            unsafe_bounds_formatted[i] = np.zeros((self.action_dim + self.diffusion_model.observation_dim, 2 * len(unsafe_bounds[i])))
             for n_obs in range(len(unsafe_bounds[i])):
-                unsafe_bounds_formatted[i][:, 2 * n_obs] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:, 0], 'observations')
-                unsafe_bounds_formatted[i][:, 2 * n_obs + 1] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:, 1], 'observations')
+                unsafe_bounds_formatted[i][:self.action_dim, 2 * n_obs] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:self.action_dim, 0], 'actions')
+                unsafe_bounds_formatted[i][:self.action_dim, 2 * n_obs + 1] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:self.action_dim, 1], 'actions')
+                unsafe_bounds_formatted[i][self.action_dim:, 2 * n_obs] = self.normalizer.normalize(unsafe_bounds[i][n_obs][self.action_dim:, 0], 'observations')
+                unsafe_bounds_formatted[i][self.action_dim:, 2 * n_obs + 1] = self.normalizer.normalize(unsafe_bounds[i][n_obs][self.action_dim:, 1], 'observations')
         
         unsafe_bounds_formatted = utils.to_torch(unsafe_bounds_formatted, dtype=torch.float32, device='cuda:0')
         return unsafe_bounds_formatted
-
+    

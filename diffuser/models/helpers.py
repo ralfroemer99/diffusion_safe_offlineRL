@@ -1,3 +1,4 @@
+import time
 import math
 import numpy as np
 import torch
@@ -139,9 +140,10 @@ def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
     betas_clipped = np.clip(betas, a_min=0, a_max=0.999)
     return torch.tensor(betas_clipped, dtype=dtype)
 
-def apply_conditioning(x, conditions, action_dim, goal_dim=0):
+def apply_conditioning(x, conditions, action_dim, goal_dim=0, k=1):
+    # start_time = time.time()
     for t, val in conditions.items():
-        if t == 'unsafe_bounds':     # unsafe sets
+        if t == 'unsafe_bounds' or t == 'dims':     # unsafe sets
             continue
         if val.shape[-1] == x.shape[-1]:
             x[:, t, :] = val.clone()
@@ -151,41 +153,90 @@ def apply_conditioning(x, conditions, action_dim, goal_dim=0):
     if goal_dim > 0:
         x[:, :, -goal_dim:] = conditions[0][:, -goal_dim:].unsqueeze(1).clone()
     
-    if conditions.get('unsafe_bounds') is not None:
-        x = apply_projection(x, conditions['unsafe_bounds'], action_dim)
+    if (k <= 10) and (conditions.get('unsafe_bounds') is not None):
+        # print('Time to apply conditioning:', time.time() - start_time)
+        # start_time = time.time()
+        x = apply_projection(x, conditions['unsafe_bounds'], conditions['dims'], action_dim)
+        # print('Time to apply projection:', time.time() - start_time)
 
     return x
 
-def apply_projection(x, unsafe_bounds, action_dim):
+def apply_projection(x, unsafe_bounds, dims_all, action_dim):
     '''
         x : tensor
             [ batch_size x horizon x transition_dim ]
         unsafe_bounds : dict
-            { t: sets }, where sets is a obs_dim x (2 * n_obs) array
+            { t: sets }, where sets is a obs_dim x (2 * n_obstacles) array
+        dims_all: list of list of tensors
+            H x n_obstacles x variable_dim
     '''
-    for t, bounds in unsafe_bounds.items():     # for each time step
-        for n in range(bounds.shape[1] // 2):        # for each unsafe set
+    dims = dims_all
+    for t, bounds in unsafe_bounds.items():             # for each time step
+        for n in range(bounds.shape[1] // 2):           # for each unsafe set
             bound = bounds[:, 2 * n:2 * n + 2]
-            dims = torch.where(bound.max(dim=1).values != bound.min(dim=1).values)[0]       # get the relevant dimensions for which constraints are specified
+            # start_time = time.time()
+            # dims = dims_all[t][n]
+            # dims = torch.where(bound.max(dim=1).values != bound.min(dim=1).values)[0]       
+            # dims = torch.where(bound[:,0] != bound[:,1])[0]         # get the relevant dimensions for which constraints are specified
+            # print('Time to get relevant dimensions:', time.time() - start_time)
             
-            if len(dims) == 0:
-                continue
+            # if len(dims) == 0:
+            #     continue
             
             # Check if the relevant dimensions are within the unsafe set
-            obs = x[:, t, action_dim:]
-            mask = torch.all(torch.stack([(obs[:, dim] > bound[dim, 0]) & (obs[:, dim] < bound[dim, 1]) for dim in dims]), axis=0)
-            
+            # obs = x[:, t]
+            mask = torch.all(torch.stack([(x[:, t, dim] > bound[dim, 0]) & (x[:, t, dim] < bound[dim, 1]) for dim in dims]), axis=0)
+            # mask = torch.all(torch.stack([(obs[:, dim] > bound[dim, 0]) & (obs[:, dim] < bound[dim, 1]) for dim in dims]), axis=0)
+
             # If it is, project it to the boundary of the unsafe set
             if mask.any():
                 for _ in torch.where(mask)[0]:
-                    proj = x[_, t, action_dim+dims].clone()
-                    proj_min = bound[dims, 0]
-                    proj_max = bound[dims, 1]
-
-                    pos = project_out(proj, proj_min, proj_max)
-                    x[_, t, action_dim+dims] = pos.clone()
+                #     # proj = x[_, t, action_dim+dims].clone()
+                #     # proj_min = bound[dims, 0]
+                #     # proj_max = bound[dims, 1]
+                #     # pos = project_out(proj, proj_min, proj_max)
+                #     # x[_, t, action_dim+dims] = pos.clone()
+                    x[_, t, dims] = project_out(x[_, t, dims], bound[dims, 0], bound[dims, 1])     
         
     return x
+
+def apply_projection_fast(x, unsafe_bounds, action_dim):
+    '''
+        x : tensor
+            [ batch_size x horizon x transition_dim ]
+        unsafe_bounds : dict
+            { t: sets }, where sets is a obs_dim x (2 * n_unsafe_regions) array
+    '''
+    for t, bounds in unsafe_bounds.items():     # for each time step
+        n_sets = bounds.shape[1] // 2
+        # bounds = bounds.view(-1, 2).t().unsqueeze(1).expand(-1, x.shape[0], -1).cuda()
+        # torch.where([bounds[:, 2 * i] != bounds[:, 2 * i + 1] for i in range(n_sets)][0])
+        dims = torch.where(bounds[:, 0] != bounds[:, 1])[0]            # ONLY WORKS if all unsafe sets are specified for the same dimensions!
+
+        if len(dims) == 0:
+            continue
+
+        cur_obs_action = x[:, t]
+        cur_repeat = cur_obs_action.unsqueeze(2).expand(-1, -1, 2 * n_sets).cuda()
+        bounds_repeat = bounds.unsqueeze(0).expand(x.shape[0], -1, -1).cuda()
+
+        lower_violated = torch.all((cur_repeat[:, action_dim:] < bounds_repeat[:, :, 0]), dim=1)
+
+        mask = torch.all((cur_repeat[:, action_dim:] > bounds_repeat[:, :, 0]) & (cur_repeat[:, action_dim:] < bounds_repeat[:, :, 1]), dim=1)
+
+        # Check if the relevant dimensions are within the unsafe set
+        obs = x[:, t, action_dim:].unsqueeze(2).expand(-1, -1, n_sets).cuda()
+        mask = torch.all((obs > bounds[0]) & (obs < bounds[1]), dim=0)
+
+        # If it is, project it to the boundary of the unsafe set
+        if mask.any():
+            # proj = x[mask, t, action_dim+dims].clone()
+            # proj_min = bounds[0, mask]
+            # proj_max = bounds[1, mask]
+
+            # pos = project_out(proj, proj_min, proj_max)
+            # x[mask, t, action_dim+dims] = pos.clone()
+            x[mask, t, dims] = project_out(x[mask, t, dims], bounds[0, mask], bounds[1, mask])
 
 def project_out(x, x_min, x_max):
     '''
@@ -198,7 +249,7 @@ def project_out(x, x_min, x_max):
     # Change one value of x so that x_min <= x <= x_max does not hold. Choose the value that is closest to the boundary
     distances = torch.stack([x - x_min, x_max - x])
     min_idx = torch.argmin(distances)
-    dim, min_or_max = torch.div(min_idx, distances.shape[0], rounding_mode='floor'), min_idx % distances.shape[0]
+    min_or_max, dim = torch.div(min_idx, distances.shape[0], rounding_mode='floor'), min_idx % distances.shape[0]
 
     x[dim] = x_min[dim] if min_or_max == 0 else x_max[dim]
 
