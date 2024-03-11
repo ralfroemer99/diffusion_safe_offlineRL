@@ -13,7 +13,7 @@ from envs.pointmass import PointMassEnv
 #-----------------------------------------------------------------------------#
 
 data_save_path = 'results/data'
-save_animation = True
+save_animation = False
 animation_save_path = 'results/animation' if save_animation else None
 
 # List of arguments to pass to the script
@@ -24,7 +24,7 @@ n_obstacles_range = [[0, 5],
 # with_projections_range = [False, True]
 with_projections_range = [True]
 # warmstart_steps_range = [False, 2, 4]
-warmstart_steps_range = [1, 2, 3, 4, False]
+warmstart_steps_range = [1, 2, 3, 4, 5, 7, 10, 15, False]
 
 
 n_trials = 100
