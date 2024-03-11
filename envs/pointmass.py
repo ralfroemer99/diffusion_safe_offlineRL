@@ -114,6 +114,8 @@ class PointMassEnv(core.Env):
         else:
             while not is_valid:
                 self.state = self.state_space.sample()
+                if self.test:
+                    self.state[[1, 3]] = 0        # Start with zero velocity for testing
                 is_valid = self._check_initial_pos(self.state) and self._check_initial_vel(self.state)
         self.timestep = 0
         if self.random_target:
@@ -164,7 +166,7 @@ class PointMassEnv(core.Env):
         return True
 
     def _check_initial_pos(self, state):
-        obstacle_distance = 0.5
+        obstacle_distance = 1.0
 
         p = self._get_coordinates(state)
         if self.target is not None:

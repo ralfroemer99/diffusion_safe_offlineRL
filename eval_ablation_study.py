@@ -13,13 +13,14 @@ from envs.pointmass import PointMassEnv
 save_path = 'results/scale_batch_size_ablation'
 
 # List of arguments to pass to the script
-systems_list = ['pointmass', 'quad2d']
-scale_range = np.logspace(-1, 4, 11)
-# scale_range = np.logspace(-1, 3, 3)
-batch_size_range = [1, 2, 4, 8]
-# batch_size_range = [1, 2]
+# systems_list = ['pointmass', 'quad2d']
+systems_list = ['quad2d']
+# scale_range = np.logspace(-1, 4, 11)
+scale_range = np.logspace(0.5, 4, 8)
+# batch_size_range = [1, 2, 4, 8]
+batch_size_range = [8]
 
-n_trials = 10
+n_trials = 100
 
 for system in systems_list:
     class Parser(utils.Parser):
@@ -93,6 +94,9 @@ for system in systems_list:
             n_reached = 0
             reward_total = 0
             for n in range(n_trials):
+                if n % 10 == 0:
+                    print(f'{args.dataset}, use actions: {args.use_actions}, scale: {round(scale, 2)}, batch_size: {batch_size}, trial: {n}')
+
                 # Reset environment
                 obs = env.reset(seed=n)
 

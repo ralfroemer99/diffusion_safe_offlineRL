@@ -17,18 +17,18 @@ save_animation = False
 animation_save_path = 'results/animation' if save_animation else None
 
 # List of arguments to pass to the script
+# systems_list = ['pointmass', 'quad2d']
 systems_list = ['pointmass', 'quad2d']
 # n_obstacles_range = [[0, 5]]
 n_obstacles_range = [[0, 2, 0, 3],
                      [1, 2, 2, 3]]
 # with_projections_range = [False, True]
-with_projections_range = [True]
-# warmstart_steps_range = [False, 2, 4]
-warmstart_steps_range = [1, 2, 3, 4, 5, 7, 10, 15, False]
+with_projections_range = [False, True]
+# warmstart_steps_range = [1, 2, 3, 4, 5, 7, 10, 15, False]
+warmstart_steps_range = [1, 2, 3, 4, 5, 6, 7, 10, 15, False]
 
 
 n_trials = 100
-t_check_collision = 1
 
 for system in systems_list:
     # Store success rate and reward
@@ -66,6 +66,8 @@ for system in systems_list:
     guide = guide_config()
 
     for idx0, with_projections in enumerate(with_projections_range):
+        warmstart_steps_range_mod = warmstart_steps_range if with_projections else [False]
+
         for idx1, n_obstacles in enumerate(n_obstacles_range):
             ## policies are wrappers around an unconditional diffusion model and a value guide
             policy_config = utils.Config(
@@ -82,13 +84,14 @@ for system in systems_list:
                 scale_grad_by_std=args.scale_grad_by_std,       # comment
                 verbose=False,
             )
-            for idx2, warmstart_steps in enumerate(warmstart_steps_range):
+            for idx2, warmstart_steps in enumerate(warmstart_steps_range_mod):
                 
                 n_reached = 0
                 reward_total = 0
                 observations_all = np.zeros((n_trials, simulation_timesteps, obs_dim))
                 actions_all = np.zeros((n_trials, simulation_timesteps, 2))
                 reward_all = np.zeros((n_trials, simulation_timesteps))
+                target_reached_all = np.zeros((n_trials))
                 is_done_all = np.zeros((n_trials, simulation_timesteps))
                 
                 #-----------------Closed-loop experiment with obstacles-----------------------#
@@ -141,22 +144,23 @@ for system in systems_list:
                         
                         # Sample state sequence or state-action sequence
                         if with_projections:
-                            unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
+                            unsafe_bounds_box, unsafe_bounds_circle = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
                             # action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=unsafe_bounds, warm_start=True, 
                             #                          warm_start_steps=warmstart_steps, verbose=False)
                         else:
-                            unsafe_bounds = None
+                            unsafe_bounds_box, unsafe_bounds_circle = None, None
                             # action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=None, warm_start=warmstart_steps, 
                             #                          verbose=False)
                             
                         warm_start = True if warmstart_steps is not False else False
                         warm_start_steps = warmstart_steps if warmstart_steps is not False else None
 
-                        action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=unsafe_bounds, warm_start=warm_start, 
-                                                 warm_start_steps=warmstart_steps, verbose=False)
+                        action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds_box=unsafe_bounds_box, unsafe_bounds_circle=unsafe_bounds_circle,
+                                                 warm_start=warm_start, warm_start_steps=warmstart_steps, verbose=False)
                         
                         if save_animation:
-                            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], save_path=save_path)
+                            old_path = None if _ == 0 else observations_all[n][:_ + 1, [0, 2]]
+                            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], old_path=old_path, save_path=save_path)
 
                         # Step environment
                         if not args.use_actions:
@@ -174,6 +178,7 @@ for system in systems_list:
 
                         if target_reached == True:
                             n_reached += 1
+                            target_reached_all[n] = 1
 
                         if done:
                             break
@@ -187,8 +192,8 @@ for system in systems_list:
                 success_rate = n_reached / n_trials
                 reward = reward_total / n_trials
 
-                print(f'{args.dataset}, use actions: {args.use_actions}, with projections: {with_projections}, n_obstacles: {n_obstacles}, \
-                      warmstart_steps: {warmstart_steps}, SUCCESS RATE: {success_rate}, MEAN REWARD: {round(reward, 1)}')
+                print(f'{args.dataset}, use actions: {args.use_actions}, with projections: {with_projections}, n_obstacles: {n_obstacles}, warmstart_steps: {warmstart_steps}, SUCCESS RATE: {success_rate}, MEAN REWARD: {round(reward, 1)}')
+                print(f'Failed in seeds: {np.where(target_reached_all == 0)}')
 
                 results = {'system': system,
                             'use_actions': args.use_actions,
@@ -200,6 +205,7 @@ for system in systems_list:
                             'observations_all': observations_all,
                             'actions_all': actions_all,
                             'rewards_all': reward_all,
+                            'target_reached_all': target_reached_all,
                             }
                 
                 save_path = data_save_path  + '/' + system + \

@@ -182,7 +182,7 @@ class Quad2DEnv(core.Env):
         return True
 
     def _check_initial_pos(self, state):
-        obstacle_distance = 0.5
+        obstacle_distance = 1.0
 
         p = self._get_coordinates(state)
         if self.target is not None:
