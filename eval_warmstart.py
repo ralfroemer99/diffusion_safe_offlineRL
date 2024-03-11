@@ -20,20 +20,18 @@ animation_save_path = 'results/animation' if save_animation else None
 # systems_list = ['pointmass', 'quad2d']
 systems_list = ['pointmass', 'quad2d']
 # n_obstacles_range = [[0, 5]]
-n_obstacles_range = [[0, 2, 0, 3],
-                     [1, 2, 2, 3]]
-# with_projections_range = [False, True]
+n_obstacles_range = [[0, 5, 0, 5],
+                     [2, 5, 2, 5]]
 with_projections_range = [False, True]
-# warmstart_steps_range = [1, 2, 3, 4, 5, 7, 10, 15, False]
-warmstart_steps_range = [1, 2, 3, 4, 5, 6, 7, 10, 15, False]
-
+# with_projections_range = [True]
+warmstart_steps_range = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, False]
 
 n_trials = 100
 
 for system in systems_list:
     # Store success rate and reward
     success_rate_all = np.zeros((len(n_obstacles_range), len(with_projections_range), len(warmstart_steps_range)))
-    reward_mean_all = np.zeros((len(n_obstacles_range), len(with_projections_range), len(warmstart_steps_range)))
+    # reward_mean_all = np.zeros((len(n_obstacles_range), len(with_projections_range), len(warmstart_steps_range)))
 
     obs_dim = 6 if system == 'pointmass' else 9
     simulation_timesteps = 100 if system == 'pointmass' else 200
@@ -85,7 +83,6 @@ for system in systems_list:
                 verbose=False,
             )
             for idx2, warmstart_steps in enumerate(warmstart_steps_range_mod):
-                
                 n_reached = 0
                 reward_total = 0
                 observations_all = np.zeros((n_trials, simulation_timesteps, obs_dim))
@@ -96,9 +93,6 @@ for system in systems_list:
                 
                 #-----------------Closed-loop experiment with obstacles-----------------------#
                 for n in range(n_trials):
-                    # if n % 10 == 0:
-                    #     print(f'{args.dataset}, use actions: {args.use_actions}, with projections: {with_projections}, n_obstacles: {n_obstacles}, trial: {n}')
-
                     if save_animation:
                         if warmstart_steps is False:
                             save_path = animation_save_path  + '/' + system + \
@@ -145,12 +139,8 @@ for system in systems_list:
                         # Sample state sequence or state-action sequence
                         if with_projections:
                             unsafe_bounds_box, unsafe_bounds_circle = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
-                            # action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=unsafe_bounds, warm_start=True, 
-                            #                          warm_start_steps=warmstart_steps, verbose=False)
                         else:
                             unsafe_bounds_box, unsafe_bounds_circle = None, None
-                            # action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=None, warm_start=warmstart_steps, 
-                            #                          verbose=False)
                             
                         warm_start = True if warmstart_steps is not False else False
                         warm_start_steps = warmstart_steps if warmstart_steps is not False else None
@@ -190,10 +180,11 @@ for system in systems_list:
                         subprocess.call(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
                 success_rate = n_reached / n_trials
-                reward = reward_total / n_trials
+                # reward = reward_total / n_trials
+                reward = np.mean(reward_all[reward_all != 0])
 
                 print(f'{args.dataset}, use actions: {args.use_actions}, with projections: {with_projections}, n_obstacles: {n_obstacles}, warmstart_steps: {warmstart_steps}, SUCCESS RATE: {success_rate}, MEAN REWARD: {round(reward, 1)}')
-                print(f'Failed in seeds: {np.where(target_reached_all == 0)}')
+                # print(f'Failed in seeds: {np.where(target_reached_all == 0)}')
 
                 results = {'system': system,
                             'use_actions': args.use_actions,
@@ -201,20 +192,24 @@ for system in systems_list:
                             'warmstart_steps': warmstart_steps,
                             'n_obstacles': n_obstacles,
                             'success_rate': success_rate_all,
-                            'reward_mean': reward_mean_all,
                             'observations_all': observations_all,
                             'actions_all': actions_all,
                             'rewards_all': reward_all,
                             'target_reached_all': target_reached_all,
                             }
                 
-                save_path = data_save_path  + '/' + system + \
-                                            '/use_actions_' + str(args.use_actions) + \
-                                            '/projection_' + str(with_projections) + \
-                                            '/no_warmstart' + \
-                                            '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3])
-
-                # save_path = data_save_path + '/' + system + '/n_obs' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '/projection_' + str(with_projections) + '/warmstart_steps' + str(warmstart_steps)
+                if warmstart_steps is False:
+                    save_path = data_save_path  + '/' + system + \
+                                                '/use_actions_' + str(args.use_actions) + \
+                                                '/projection_' + str(with_projections) + \
+                                                '/no_warmstart' + \
+                                                '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3])
+                else:
+                    save_path = data_save_path  + '/' + system + \
+                                                        '/use_actions_' + str(args.use_actions) + \
+                                                        '/projection_' + str(with_projections) + \
+                                                        '/warmstart_steps_' + str(warmstart_steps) + \
+                                                        '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3])
 
                 if not os.path.exists(save_path):
                     os.makedirs(save_path)

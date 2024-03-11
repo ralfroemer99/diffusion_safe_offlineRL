@@ -206,33 +206,94 @@ class PointMassEnv(core.Env):
         '''
         self.obstacles = []
 
-        for _ in range(self.n_moving_obstacles_box):
-            d = 0.2 + self.np_random.rand() * (1 - 0.2)         # Create a square obstacle with a random initial position and velocity
-            x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)    # Random x/y initial position in [-self.MAX_X/Y + d/2, self.MAX_X/Y - d/2]
-            y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
-            vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-0.5 * self.MAX_VEL_X/Y, 0.5 * self.MAX_VEL_X/Y]
-            vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
-            self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d})
-
-        for _ in range(self.n_static_obstacles_box):
+        counter = 0
+        while counter < self.n_moving_obstacles_box:
             d = 0.2 + self.np_random.rand() * (1 - 0.2)
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
-            self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'd': d})
+            is_valid = True
+            for i in range(counter):
+                obstacle = self.obstacles[i]
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                    is_valid = False
+                    break
+            if is_valid:
+                vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)
+                vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+                self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d})
+                counter += 1
 
-        for _ in range(self.n_moving_obstacles_circle):
-            r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+        while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box:
+            d = 0.2 + self.np_random.rand() * (1 - 0.2)
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
-            vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)
-            vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
-            self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'r': r})
+            is_valid = True
+            for i in range(counter):
+                obstacle = self.obstacles[i]
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                    is_valid = False
+                    break
+            if is_valid:
+                self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'd': d})
+                counter += 1
 
-        for _ in range(self.n_static_obstacles_circle):
+        while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box + self.n_moving_obstacles_circle:
             r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
-            x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
-            y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
-            self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'r': r})
+            x = (2 * self.MAX_X - r) * (self.np_random.rand() - 0.5)
+            y = (2 * self.MAX_Y - r) * (self.np_random.rand() - 0.5)
+            is_valid = True
+            for i in range(counter):
+                obstacle = self.obstacles[i]
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                    is_valid = False
+                    break
+            if is_valid:
+                vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)
+                vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+                self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'r': r})
+                counter += 1
+
+        while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box + self.n_moving_obstacles_circle + self.n_static_obstacles_circle:
+            r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+            x = (2 * self.MAX_X - r) * (self.np_random.rand() - 0.5)
+            y = (2 * self.MAX_Y - r) * (self.np_random.rand() - 0.5)
+            is_valid = True
+            for i in range(counter):
+                obstacle = self.obstacles[i]
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                    is_valid = False
+                    break
+            if is_valid:
+                self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'r': r})
+                counter += 1
+
+        # for _ in range(self.n_moving_obstacles_box):
+        #     d = 0.2 + self.np_random.rand() * (1 - 0.2)         # Create a square obstacle with a random initial position and velocity
+        #     x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)    # Random x/y initial position in [-self.MAX_X/Y + d/2, self.MAX_X/Y - d/2]
+        #     y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+        #     vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-0.5 * self.MAX_VEL_X/Y, 0.5 * self.MAX_VEL_X/Y]
+        #     vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+        #     self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d})
+
+        # for _ in range(self.n_static_obstacles_box):
+        #     d = 0.2 + self.np_random.rand() * (1 - 0.2)
+        #     x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
+        #     y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+        #     self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'd': d})
+
+        # for _ in range(self.n_moving_obstacles_circle):
+        #     r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+        #     x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
+        #     y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+        #     vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)
+        #     vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+        #     self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'r': r})
+
+        # for _ in range(self.n_static_obstacles_circle):
+        #     r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+        #     x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
+        #     y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+        #     self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'r': r})
 
     def step(self, a):
         s = self.state
