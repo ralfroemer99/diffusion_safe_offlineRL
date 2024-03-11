@@ -13,15 +13,12 @@ from envs.pointmass import PointMassEnv
 
 system = 'pointmass'
 
-# List of arguments to pass to the script
-
 with_actions = True         # Has no impact
 # with_projections = [False, True]
-with_projections = [False, True]
+with_projections = [True]
 
 n_trials = 100
-t_check_collision = 1       # 1 second --> 20 timesteps for quad2d, 10 timesteps for pointmass
-n_obstacles = [0, 5]        # dynamic obstacles, static obstacles
+n_obstacles = [0, 1, 0, 5]        # dynamic box obstacles, static box obstacles, dynamic circle obstacles, static circle obstacles
 epsilon = 0.2
 # seeds = [0, 1]
 seeds = np.arange(10, 30).tolist()
@@ -85,11 +82,13 @@ for idx0, with_projection in enumerate(with_projections):
         if args.dataset == 'pointmass':
             env = PointMassEnv(target=None, max_steps=simulation_timesteps, initial_state=None, epsilon=epsilon, reset_target_reached=True, 
                             bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
-                            n_moving_obstacles=n_obstacles[0], n_static_obstacles=n_obstacles[1], seed=seed)
+                            n_moving_obstacles_box=n_obstacles[0], n_static_obstacles_box=n_obstacles[1], n_moving_obstacles_circle=n_obstacles[2], 
+                            n_static_obstacles_circle=n_obstacles[3], seed=seed)
         else:
             env = Quad2DEnv(target=None, max_steps=simulation_timesteps, initial_state=None, epsilon=epsilon, reset_target_reached=True, 
                             bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10, 
-                            n_moving_obstacles=n_obstacles[0], n_static_obstacles=n_obstacles[1], min_rel_thrust=0.75, max_rel_thrust=1.25, 
+                            n_moving_obstacles_box=n_obstacles[0], n_static_obstacles_box=n_obstacles[1], n_moving_obstacles_circle=n_obstacles[2], 
+                            n_static_obstacles_circle=n_obstacles[3], min_rel_thrust=0.75, max_rel_thrust=1.25, 
                             max_rel_thrust_difference=0.01, test=True, seed=seed)
 
         #-----------------Closed-loop experiment with obstacles-----------------------#
@@ -106,14 +105,16 @@ for idx0, with_projection in enumerate(with_projections):
             
             # Sample state sequence or state-action sequence
             if with_projection:
-                unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
+                unsafe_bounds_boxes, unsafe_bounds_circles = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
                 # unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=int(t_check_collision / env.dt), obs_dim=obs_dim)
                 # start_time = time.time()
-                action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=unsafe_bounds, verbose=False)
+                action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds_box=unsafe_bounds_boxes, 
+                                         unsafe_bounds_circle=unsafe_bounds_circles, verbose=False)
                 # print(f'Policy: {time.time() - start_time}')
             else:
-                action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds=None, verbose=False)
-            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], save_path=save_path)
+                action, samples = policy(conditions=conditions, batch_size=args.batch_size, verbose=False)
+
+            env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], old_path=observations_all[:_ + 1, [0, 2]], save_path=save_path)
 
             # Step environment
             if not args.use_actions:
@@ -144,13 +145,13 @@ for idx0, with_projection in enumerate(with_projections):
                     'rewards_all': reward_all,
         }
 
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-        with open(save_path + '/' + system + '_seed_' + str(seed) + '.pkl', 'wb') as f:
-            pickle.dump(results, f)
+        # if not os.path.exists(save_path):
+        #     os.makedirs(save_path)
+        # with open(save_path + '/' + system + '_seed_' + str(seed) + '.pkl', 'wb') as f:
+        #     pickle.dump(results, f)
 
-        command = 'ffmpeg -y -r ' + str(int(1/env.dt)) + ' -i ' + save_path + '/screen_%03d.png -vcodec libx264 -pix_fmt yuv420p ' + save_path + '/a_video.mp4'
-        subprocess.call(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        # command = 'ffmpeg -y -r ' + str(int(1/env.dt)) + ' -i ' + save_path + '/screen_%03d.png -vcodec libx264 -pix_fmt yuv420p ' + save_path + '/a_video.mp4'
+        # subprocess.call(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
         # command = "ffmpeg -r 20 -f image2 -s 1500x1500 -i results/animation/pointmass/seed_0/screen_%03d.png -vcodec libx264 -crf 25  results/animation/pointmass/seed_0/video2.mp4"
         # subprocess.call(command, shell=True)
 

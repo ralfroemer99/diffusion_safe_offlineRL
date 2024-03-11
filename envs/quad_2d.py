@@ -41,7 +41,8 @@ class Quad2DEnv(core.Env):
     def __init__(self, min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, g=9.81, 
                  target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
                  reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True,
-                 n_moving_obstacles=0, n_static_obstacles=0, reward='squared_distance', test=False, seed=0):
+                 n_moving_obstacles_box=0, n_static_obstacles_box=0, n_moving_obstacles_circle=0, n_static_obstacles_circle=0,
+                 reward='squared_distance', test=False, seed=0):
         self.screen = None
         self.clock = None
         self.isopen = True
@@ -78,9 +79,14 @@ class Quad2DEnv(core.Env):
         self.state = None
         self.g = g
 
-        self.n_moving_obstacles = n_moving_obstacles
-        self.n_static_obstacles = n_static_obstacles
-        self.n_obstacles = n_moving_obstacles + n_static_obstacles
+        self.n_moving_obstacles_box = n_moving_obstacles_box
+        self.n_static_obstacles_box = n_static_obstacles_box
+        self.n_obstacles_box = n_moving_obstacles_box + n_static_obstacles_box
+        self.n_moving_obstacles_circle = n_moving_obstacles_circle
+        self.n_static_obstacles_circle = n_static_obstacles_circle
+        self.n_obstacles_circle = n_moving_obstacles_circle + n_static_obstacles_circle
+        self.n_obstacles = self.n_obstacles_box + self.n_obstacles_circle
+
         if self.n_obstacles > 0:
             self._generate_obstacles()
 
@@ -148,36 +154,55 @@ class Quad2DEnv(core.Env):
         return (x, y)
 
     def _check_target(self, target):
+        obstacle_distance = 0.2
+
         # Check if the target is at least epsilon away from the initial position
         if self.state is not None:
             p = self._get_coordinates(self.state)
             distance = np.linalg.norm(np.array(p) - np.array(target))
             if distance <= self.epsilon:
                 return False
-        if self.n_obstacles > 0:
-            for i in range(self.n_obstacles):
+            
+        if self.n_static_obstacles_box > 0:
+            for i in np.arange(self.n_moving_obstacles_box, self.n_obstacles_box):          # Check that the target is not inside any obstacle
                 obstacle = self.obstacles[i]
-                if target[0] >= obstacle['x'] - obstacle['d'] / 2 and \
-                    target[0] <= obstacle['x'] + obstacle['d'] / 2 and \
-                    target[1] >= obstacle['y'] - obstacle['d'] / 2 and \
-                    target[1] <= obstacle['y'] + obstacle['d'] / 2:
+                if target[0] >= obstacle['x'] - obstacle['d'] / 2 - obstacle_distance and \
+                    target[0] <= obstacle['x'] + obstacle['d'] / 2 + obstacle_distance and \
+                    target[1] >= obstacle['y'] - obstacle['d'] / 2 - obstacle_distance and \
+                    target[1] <= obstacle['y'] + obstacle['d'] / 2 + obstacle_distance:
                     return False
+                
+        if self.n_static_obstacles_circle > 0:
+            for i in np.arange(self.n_obstacles_box + self.n_moving_obstacles_circle, self.n_obstacles):      # Check that the target is not inside any obstacle
+                obstacle = self.obstacles[i]
+                distance = np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array(target))
+                if distance <= obstacle['r'] + obstacle_distance:
+                    return False
+                
         return True
 
     def _check_initial_pos(self, state):
+        obstacle_distance = 0.5
+
         p = self._get_coordinates(state)
         if self.target is not None:
             distance = np.linalg.norm(np.array(p) - np.array(self.target))
             if distance <= self.epsilon:
                 return False
+            
         if self.n_obstacles > 0:
             for i in range(self.n_obstacles):
                 obstacle = self.obstacles[i]
-                if p[0] >= obstacle['x'] - obstacle['d'] / 2 and \
-                    p[0] <= obstacle['x'] + obstacle['d'] / 2 and \
-                    p[1] >= obstacle['y'] - obstacle['d'] / 2 and \
-                    p[1] <= obstacle['y'] + obstacle['d'] / 2:
-                    return False
+                if 'd' in obstacle:
+                    if p[0] >= obstacle['x'] - obstacle['d'] / 2 - obstacle_distance and \
+                        p[0] <= obstacle['x'] + obstacle['d'] / 2 + obstacle_distance and \
+                        p[1] >= obstacle['y'] - obstacle['d'] / 2 - obstacle_distance and \
+                        p[1] <= obstacle['y'] + obstacle['d'] / 2 + obstacle_distance:
+                        return False
+                if 'r' in obstacle:
+                    distance = np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array(p))
+                    if distance <= obstacle['r'] + obstacle_distance:
+                        return False
         return True
     
     def _check_initial_vel(self, state):
@@ -196,26 +221,39 @@ class Quad2DEnv(core.Env):
         return True
 
     def _generate_obstacles(self):
+        '''
+            Generate the obstacles for the environment.
+            Ordering: [moving_boxes, static_boxes, moving_circles, static_circles]
+        '''        
         self.obstacles = []
 
-        for _ in range(self.n_moving_obstacles):
+        for _ in range(self.n_moving_obstacles_box):
             d = 0.2 + self.np_random.rand() * (1 - 0.2)         # Create a square obstacle with a random initial position and velocity
-
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)    # Random x/y initial position in [-self.MAX_X/Y + d/2, self.MAX_X/Y - d/2]
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
-
-            vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-self.MAX_VEL_X/Y, self.MAX_VEL_X/Y]
+            vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)     # Random x/y velocity in [-0.5 * self.MAX_VEL_X/Y, 0.5 * self.MAX_VEL_X/Y]
             vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
-
             self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d})
 
-        for _ in range(self.n_static_obstacles):
+        for _ in range(self.n_static_obstacles_box):
             d = 0.2 + self.np_random.rand() * (1 - 0.2)
-
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
-
             self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'd': d})
+
+        for _ in range(self.n_moving_obstacles_circle):
+            r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+            x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
+            y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+            vx = self.MAX_VEL_X * (self.np_random.rand() - 0.5)
+            vy = self.MAX_VEL_Y * (self.np_random.rand() - 0.5)
+            self.obstacles.append({'x': x, 'y': y, 'vx': vx, 'vy': vy, 'r': r})
+
+        for _ in range(self.n_static_obstacles_circle):
+            r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+            x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
+            y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
+            self.obstacles.append({'x': x, 'y': y, 'vx': 0, 'vy': 0, 'r': r})
 
     def step(self, a):
         s = self.state
@@ -246,15 +284,29 @@ class Quad2DEnv(core.Env):
         self.prev_state = self.state
         self.state = ns
 
-        # Move obstacles
-        if self.n_moving_obstacles > 0:
-            for i in range(self.n_moving_obstacles):
+        # Move box-shaped obstacles
+        if self.n_moving_obstacles_box > 0:
+            for i in range(self.n_moving_obstacles_box):
                 obstacle = self.obstacles[i]
                 possible_new_x = obstacle['x'] + obstacle['vx'] * self.dt
                 possible_new_y = obstacle['y'] + obstacle['vy'] * self.dt
                 if possible_new_x <= -self.MAX_X + obstacle['d'] / 2 or possible_new_x >= self.MAX_X - obstacle['d'] / 2:
                     obstacle['vx'] *= -1
                 if possible_new_y <= -self.MAX_Y + obstacle['d'] / 2 or possible_new_y >= self.MAX_Y - obstacle['d'] / 2:
+                    obstacle['vy'] *= -1
+
+                obstacle['x'] += obstacle['vx'] * self.dt
+                obstacle['y'] += obstacle['vy'] * self.dt
+
+        # Move circular obstacles
+        if self.n_moving_obstacles_circle > 0:
+            for i in range(self.n_moving_obstacles_circle):
+                obstacle = self.obstacles[self.n_obstacles_box + i]
+                possible_new_x = obstacle['x'] + obstacle['vx'] * self.dt
+                possible_new_y = obstacle['y'] + obstacle['vy'] * self.dt
+                if possible_new_x <= -self.MAX_X + obstacle['r'] or possible_new_x >= self.MAX_X - obstacle['r']:
+                    obstacle['vx'] *= -1
+                if possible_new_y <= -self.MAX_Y + obstacle['r'] or possible_new_y >= self.MAX_Y - obstacle['r']:
                     obstacle['vy'] *= -1
 
                 obstacle['x'] += obstacle['vx'] * self.dt
@@ -312,13 +364,13 @@ class Quad2DEnv(core.Env):
             return {0: [{'x': x, 'y': y, 'vx': vx, 'vy': vy, 'd': d}, ...], 1: [...], ..., horizon: [...]}
         '''
 
-        if self.n_obstacles == 0:
+        if self.n_obstacles is None or self.n_obstacles == 0:
             return None
 
         predictions = {}
         for i in range(horizon):
             predictions[i] = []
-            for j in range(self.n_obstacles):       
+            for j in range(self.n_obstacles_box):       
                 if i == 0:
                     predictions[i].append({'x': self.obstacles[j]['x'], 'y': self.obstacles[j]['y'], 'vx': self.obstacles[j]['vx'], 'vy': self.obstacles[j]['vy'], 'd': self.obstacles[j]['d']})
                     continue
@@ -338,6 +390,27 @@ class Quad2DEnv(core.Env):
                     vy *= -1
 
                 predictions[i].append({'x': x + vx * self.dt, 'y': y + vy * self.dt, 'vx': vx, 'vy': vy, 'd': self.obstacles[j]['d']})
+
+            for j in range(self.n_obstacles_box, self.n_obstacles):
+                if i == 0:
+                    predictions[i].append({'x': self.obstacles[j]['x'], 'y': self.obstacles[j]['y'], 'vx': self.obstacles[j]['vx'], 'vy': self.obstacles[j]['vy'], 'r': self.obstacles[j]['r']})
+                    continue
+                
+                x = predictions[i - 1][j]['x']
+                y = predictions[i - 1][j]['y']
+
+                vx = predictions[i - 1][j]['vx']
+                vy = predictions[i - 1][j]['vy']
+                
+                possible_x = x + vx * self.dt
+                possible_y = y + vy * self.dt
+
+                if possible_x <= -self.MAX_X + self.obstacles[j]['r'] or possible_x >= self.MAX_X - self.obstacles[j]['r']:
+                    vx *= -1
+                if possible_y <= -self.MAX_Y + self.obstacles[j]['r'] or possible_y >= self.MAX_Y - self.obstacles[j]['r']:
+                    vy *= -1
+
+                predictions[i].append({'x': x + vx * self.dt, 'y': y + vy * self.dt, 'vx': vx, 'vy': vy, 'r': self.obstacles[j]['r']})
 
         return predictions
     
@@ -455,16 +528,20 @@ class Quad2DEnv(core.Env):
         if self.n_obstacles > 0:
             for i in range(self.n_obstacles):
                 obstacle = self.obstacles[i]
-                if self.state[0] >= obstacle['x'] - obstacle['d'] / 2 and \
-                    self.state[0] <= obstacle['x'] + obstacle['d'] / 2 and \
-                    self.state[2] >= obstacle['y'] - obstacle['d'] / 2 and \
-                    self.state[2] <= obstacle['y'] + obstacle['d'] / 2:
-                    # print("Collision!!!")
-                    self.target_reached = -1
-                    return True
+                if 'd' in obstacle:
+                    if self.state[0] >= obstacle['x'] - obstacle['d'] / 2 and \
+                        self.state[0] <= obstacle['x'] + obstacle['d'] / 2 and \
+                        self.state[2] >= obstacle['y'] - obstacle['d'] / 2 and \
+                        self.state[2] <= obstacle['y'] + obstacle['d'] / 2:
+                        self.target_reached = -1
+                        return True
+                if 'r' in obstacle:
+                    distance = np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array(self._get_coordinates(self.state)))
+                    if distance <= obstacle['r']:
+                        self.target_reached = -1
+                        return True
 
         if self.timestep == self.max_steps - 1:
-            # print("Timeout!!!")
             return True
         
         return False
@@ -487,7 +564,8 @@ class Quad2DEnv(core.Env):
 
         return (dx, ddx, dy, ddy, dtheta, ddtheta, 0.0, 0.0)
 
-    def render(self, trajectories_to_plot=None, save_path=None):
+    def render(self, trajectories_to_plot=None, old_path=None, save_path=None):
+        obstacle_color = (64, 255, 64)
         try:
             import pygame
         except ImportError:
@@ -529,16 +607,24 @@ class Quad2DEnv(core.Env):
         # Plot the obstacles as squares
         if self.n_obstacles > 0:
             for obstacle in self.obstacles:
-                left, top = int(scale * (obstacle['x'] - obstacle['d'] / 2) + offset), int(scale * (obstacle['y'] - obstacle['d'] / 2) + offset)
-                pygame.draw.rect(self.surf, (64, 255, 64), pygame.Rect(left, top, scale * obstacle['d'], scale * obstacle['d']))
+                if 'd' in obstacle:      # Box obstacle
+                    left, top = int(scale * (obstacle['x'] - obstacle['d'] / 2) + offset), int(scale * (obstacle['y'] - obstacle['d'] / 2) + offset)
+                    pygame.draw.rect(self.surf, obstacle_color, pygame.Rect(left, top, scale * obstacle['d'], scale * obstacle['d']))
+                if 'r' in obstacle:
+                    pygame.draw.circle(self.surf, obstacle_color, (int(scale * obstacle['x'] + offset), int(scale * obstacle['y'] + offset)), int(scale * obstacle['r']))
 
-        # Plot the trajectories
+        # Plot the predicted trajectories
         if trajectories_to_plot is not None:
             for _ in range(trajectories_to_plot.shape[0]):
                 traj = trajectories_to_plot[_]
                 traj = scale * traj + offset
                 color = (255, 64, 64) if _ == 0 else (64, 64, 255)
                 pygame.draw.lines(self.surf, color, False, list(map(tuple, traj.tolist())), 2)
+
+        # Plot the old path
+        if old_path is not None:          
+            old_path = scale * old_path + offset
+            pygame.draw.lines(self.surf, (0, 0, 0), False, list(map(tuple, old_path.tolist())), 1)
         
         self.surf = pygame.transform.flip(self.surf, False, True)
         self.screen.blit(self.surf, (0, 0))

@@ -19,8 +19,8 @@ animation_save_path = 'results/animation' if save_animation else None
 # List of arguments to pass to the script
 systems_list = ['pointmass', 'quad2d']
 # n_obstacles_range = [[0, 5]]
-n_obstacles_range = [[0, 5],
-                     [3, 5]]
+n_obstacles_range = [[0, 2, 0, 3],
+                     [1, 2, 2, 3]]
 # with_projections_range = [False, True]
 with_projections_range = [True]
 # warmstart_steps_range = [False, 2, 4]
@@ -102,14 +102,14 @@ for system in systems_list:
                                                         '/use_actions_' + str(args.use_actions) + \
                                                         '/projection_' + str(with_projections) + \
                                                         '/no_warmstart' + \
-                                                        '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + \
+                                                        '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3]) + \
                                                         '/seed_' + str(n)
                         else:
                             save_path = animation_save_path  + '/' + system + \
                                                                 '/use_actions_' + str(args.use_actions) + \
                                                                 '/projection_' + str(with_projections) + \
                                                                 '/warmstart_steps_' + str(warmstart_steps) + \
-                                                                '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + \
+                                                                '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3]) + \
                                                                 '/seed_' + str(n)
                         if not os.path.exists(save_path):
                             os.makedirs(save_path)
@@ -119,12 +119,13 @@ for system in systems_list:
                     if args.dataset == 'pointmass':
                         env = PointMassEnv(target=None, max_steps=simulation_timesteps, initial_state=None, epsilon=0.5, reset_target_reached=True, 
                                         bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
-                                        # n_moving_obstacles=n_obstacles[0], n_static_obstacles=n_obstacles[1])
-                                        n_moving_obstacles=n_obstacles[0], n_static_obstacles=n_obstacles[1], test=True, seed=n)
+                                        n_moving_obstacles_box=n_obstacles[0], n_static_obstacles_box=n_obstacles[1], n_moving_obstacles_circle=n_obstacles[2], 
+                                        n_static_obstacles_circle=n_obstacles[3], test=True, seed=n)
                     else:
                         env = Quad2DEnv(target=None, max_steps=simulation_timesteps, initial_state=None, epsilon=0.5, reset_target_reached=True, 
                                         bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10, 
-                                        n_moving_obstacles=n_obstacles[0], n_static_obstacles=n_obstacles[1], min_rel_thrust=0.75, max_rel_thrust=1.25, 
+                                        n_moving_obstacles_box=n_obstacles[0], n_static_obstacles_box=n_obstacles[1], n_moving_obstacles_circle=n_obstacles[2], 
+                                        n_static_obstacles_circle=n_obstacles[3], min_rel_thrust=0.75, max_rel_thrust=1.25, 
                                         max_rel_thrust_difference=0.01, test=True, seed=n)
 
                     # Reset environment
@@ -205,7 +206,7 @@ for system in systems_list:
                                             '/use_actions_' + str(args.use_actions) + \
                                             '/projection_' + str(with_projections) + \
                                             '/no_warmstart' + \
-                                            '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1])
+                                            '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3])
 
                 # save_path = data_save_path + '/' + system + '/n_obs' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '/projection_' + str(with_projections) + '/warmstart_steps' + str(warmstart_steps)
 

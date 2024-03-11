@@ -153,11 +153,11 @@ def apply_conditioning(x, conditions, action_dim, goal_dim=0, k=1):
     if goal_dim > 0:
         x[:, :, -goal_dim:] = conditions[0][:, -goal_dim:].unsqueeze(1).clone()
     
-    if (k <= 20) and (conditions.get('unsafe_bounds') is not None):
-        # print('Time to apply conditioning:', time.time() - start_time)
-        # start_time = time.time()
-        x = apply_projection(x, conditions['unsafe_bounds'], conditions['dims'], action_dim)
-        # print('Time to apply projection:', time.time() - start_time)
+    if (k <= 20) and (conditions.get('unsafe_bounds_box') is not None):
+        x = apply_projection(x, conditions['unsafe_bounds_box'], conditions['dims'], action_dim)
+
+    if (k <= 20) and (conditions.get('unsafe_bounds_circle') is not None):
+        x = apply_projection_circle(x, conditions['unsafe_bounds_circle'], conditions['dims'], action_dim)
 
     return x
 
@@ -200,44 +200,6 @@ def apply_projection(x, unsafe_bounds, dims_all, action_dim):
         
     return x
 
-def apply_projection_fast(x, unsafe_bounds, action_dim):
-    '''
-        x : tensor
-            [ batch_size x horizon x transition_dim ]
-        unsafe_bounds : dict
-            { t: sets }, where sets is a obs_dim x (2 * n_unsafe_regions) array
-    '''
-    for t, bounds in unsafe_bounds.items():     # for each time step
-        n_sets = bounds.shape[1] // 2
-        # bounds = bounds.view(-1, 2).t().unsqueeze(1).expand(-1, x.shape[0], -1).cuda()
-        # torch.where([bounds[:, 2 * i] != bounds[:, 2 * i + 1] for i in range(n_sets)][0])
-        dims = torch.where(bounds[:, 0] != bounds[:, 1])[0]            # ONLY WORKS if all unsafe sets are specified for the same dimensions!
-
-        if len(dims) == 0:
-            continue
-
-        cur_obs_action = x[:, t]
-        cur_repeat = cur_obs_action.unsqueeze(2).expand(-1, -1, 2 * n_sets).cuda()
-        bounds_repeat = bounds.unsqueeze(0).expand(x.shape[0], -1, -1).cuda()
-
-        lower_violated = torch.all((cur_repeat[:, action_dim:] < bounds_repeat[:, :, 0]), dim=1)
-
-        mask = torch.all((cur_repeat[:, action_dim:] > bounds_repeat[:, :, 0]) & (cur_repeat[:, action_dim:] < bounds_repeat[:, :, 1]), dim=1)
-
-        # Check if the relevant dimensions are within the unsafe set
-        obs = x[:, t, action_dim:].unsqueeze(2).expand(-1, -1, n_sets).cuda()
-        mask = torch.all((obs > bounds[0]) & (obs < bounds[1]), dim=0)
-
-        # If it is, project it to the boundary of the unsafe set
-        if mask.any():
-            # proj = x[mask, t, action_dim+dims].clone()
-            # proj_min = bounds[0, mask]
-            # proj_max = bounds[1, mask]
-
-            # pos = project_out(proj, proj_min, proj_max)
-            # x[mask, t, action_dim+dims] = pos.clone()
-            x[mask, t, dims] = project_out(x[mask, t, dims], bounds[0, mask], bounds[1, mask])
-
 def project_out(x, x_min, x_max):
     '''
         x : tensor
@@ -252,6 +214,47 @@ def project_out(x, x_min, x_max):
     min_or_max, dim = torch.div(min_idx, distances.shape[0], rounding_mode='floor'), min_idx % distances.shape[0]
 
     x[dim] = x_min[dim] if min_or_max == 0 else x_max[dim]
+
+    return x
+
+def apply_projection_circle(x, unsafe_bounds, dims_all, action_dim):
+    '''
+        x : tensor
+            [ batch_size x horizon x transition_dim ]
+        unsafe_bounds : dict
+            { t: sets }, where sets is a obs_dim x (2 * n_obstacles) array
+        dims_all: list of list of tensors
+            H x n_obstacles x variable_dim
+    '''
+    dims = dims_all
+    for t, bounds in unsafe_bounds.items():             # for each time step
+        for n in range(bounds.shape[1] // 2):           # for each unsafe set
+            center = bounds[:, 2 * n]
+            radius = bounds[dims[0], 2 * n + 1]
+            
+            mask = torch.sum(torch.stack([(x[:, t, dim] - center[dim])**2 for dim in dims]), dim=0) <= radius**2
+
+            # mask = torch.all(torch.stack([torch.sum((x[:, t, dim] - center[dim])**2, dim=1) <= radius**2 for dim in dims]), axis=0)
+
+            # If it is, project it to the boundary of the unsafe set
+            if mask.any():
+                for _ in torch.where(mask)[0]:
+                    x[_, t, dims] = project_out_circle(x[_, t, dims], center[dims], radius)     
+        
+    return x
+
+def project_out_circle(x, center, radius):
+    '''
+        x : tensor
+            [dim_size]
+        center: tensor
+            [dim_size]
+        radius: float
+    '''
+    
+    # Change one value of x so that x_min <= x <= x_max does not hold. Choose the value that is closest to the boundary
+    unit_vector = (x - center) / torch.norm(x - center, dim=0)
+    x = center + radius * unit_vector
 
     return x
 

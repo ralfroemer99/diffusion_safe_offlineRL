@@ -23,13 +23,18 @@ class GuidedPolicy:
         self.sample_kwargs = sample_kwargs
         self.previous_trajectories = None
 
-    def __call__(self, conditions, batch_size=1, unsafe_bounds=None, warm_start=False, warm_start_steps=None, verbose=True):
+    def __call__(self, conditions, batch_size=1, unsafe_bounds_box=None, unsafe_bounds_circle=None, warm_start=False, warm_start_steps=None, verbose=True):
         conditions = {k: self.preprocess_fn(v) for k, v in conditions.items()}
         conditions = self._format_conditions(conditions, batch_size)
-        if unsafe_bounds is not None:
-            unsafe_bounds = self._format_unsafe_bounds(unsafe_bounds)
-            conditions.update({'unsafe_bounds': unsafe_bounds})
-            conditions.update({'dims': torch.tensor([2, 4])})
+        if unsafe_bounds_box is not None:
+            unsafe_bounds_box = self._format_unsafe_bounds(unsafe_bounds_box)
+            conditions.update({'unsafe_bounds_box': unsafe_bounds_box})
+
+        if unsafe_bounds_circle is not None:
+            unsafe_bounds_circle = self._format_unsafe_bounds(unsafe_bounds_circle)
+            conditions.update({'unsafe_bounds_circle': unsafe_bounds_circle})
+        
+        conditions.update({'dims': torch.tensor([2, 4])})
 
         if warm_start and (self.previous_trajectories is not None):
             x_warmstart = torch.cat((self.previous_trajectories[:,1:,:], self.previous_trajectories[:,-1,:].unsqueeze(1)), dim=1)
