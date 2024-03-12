@@ -84,7 +84,7 @@ base = {
         'normalizer': 'LimitsNormalizer',     # 'GaussianNormalizer'
         'preprocess_fns': [],
         'use_padding': False,
-        'use_actions': False,
+        'use_actions': True,
         'max_path_length': 100,
 
         ## serialization

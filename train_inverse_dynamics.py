@@ -6,7 +6,7 @@ from envs.quad_2d import Quad2DEnv
 from envs.pointmass import PointMassEnv
 from diffuser.models.mlp import MLP, train_inverse_dynamics
 
-exp = 'pointmass'  # 'pointmass' or 'quad2d
+exp = 'quad2d'  # 'pointmass' or 'quad2d
 
 class Parser(utils.Parser):
     dataset: str = exp
@@ -39,7 +39,7 @@ dataset = dataset_config()
 save_path = 'logs/' + exp + '/inverse_dynamics/defaults_H' + str(args.horizon) + '_T' + str(args.n_diffusion_steps) + '_AFalse/model.pt'
 
 # n_episodes = dataset.n_episodes
-n_episodes = 10000
+n_episodes = 100000
 obs_dim = dataset.observation_dim
 action_dim = dataset.action_dim
 
@@ -58,4 +58,4 @@ dataset_id_observations_next = torch.cat(observations_next, dim=0)
 dataset_id_actions = torch.cat(actions, dim=0)
 model = MLP(input_size=obs_dim*2, output_size=action_dim)
 
-train_inverse_dynamics(model, dataset_id_observations, dataset_id_observations_next, dataset_id_actions, save_path=save_path)
+train_inverse_dynamics(model, dataset_id_observations, dataset_id_observations_next, dataset_id_actions, save_path=save_path, steps=2e5)

@@ -110,6 +110,7 @@ class Quad2DEnv(core.Env):
         self.bonus_reward = bonus_reward
         self.initial_state = initial_state
         self.test = test
+        self.seed = seed
 
     def reset(
         self,
@@ -638,6 +639,7 @@ class Quad2DEnv(core.Env):
             pygame.init()
             pygame.display.init()
             self.screen = pygame.display.set_mode((self.SCREEN_DIM, self.SCREEN_DIM))
+            pygame.display.set_caption('Seed: ' + str(self.seed))
         if self.clock is None:
             self.clock = pygame.time.Clock()
 

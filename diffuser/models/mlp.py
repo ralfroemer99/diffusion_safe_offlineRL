@@ -45,7 +45,7 @@ class MLP(nn.Module):
 #         print(f'Epoch {epoch+1}/{epochs}, loss: {mean_loss/len(loader)}')
 #     torch.save(model.state_dict(), save_path)
     
-def train_inverse_dynamics(model, states, next_states, actions, save_path, epochs=100, lr=0.001, batch_size=32):
+def train_inverse_dynamics(model, states, next_states, actions, save_path, steps=1e5, lr=0.001, batch_size=128):
     # Check if the directory exists. If yes, delete its content
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path))
@@ -66,6 +66,7 @@ def train_inverse_dynamics(model, states, next_states, actions, save_path, epoch
 
     best_test_loss = float('inf')
 
+    epochs = int(steps / len(train_loader))
     for epoch in range(epochs):
         # Training
         model.train()
