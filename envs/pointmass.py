@@ -95,6 +95,7 @@ class PointMassEnv(core.Env):
         self.bonus_reward = bonus_reward
         self.initial_state = initial_state
         self.test = test
+        self.seed = seed
 
     def reset(
         self,
@@ -204,17 +205,20 @@ class PointMassEnv(core.Env):
             Generate the obstacles for the environment.
             Ordering: [moving_boxes, static_boxes, moving_circles, static_circles]
         '''
+        d_range = [0.2, 1.0]
+        r_range = [0.2, 1.0]
+        dist_min = 2.0
         self.obstacles = []
 
         counter = 0
         while counter < self.n_moving_obstacles_box:
-            d = 0.2 + self.np_random.rand() * (1 - 0.2)
+            d = d_range[0] + self.np_random.rand() * (d_range[1] - d_range[0])
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
             is_valid = True
             for i in range(counter):
                 obstacle = self.obstacles[i]
-                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < dist_min:
                     is_valid = False
                     break
             if is_valid:
@@ -224,13 +228,13 @@ class PointMassEnv(core.Env):
                 counter += 1
 
         while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box:
-            d = 0.2 + self.np_random.rand() * (1 - 0.2)
+            d = d_range[0] + self.np_random.rand() * (d_range[1] - d_range[0])
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
             is_valid = True
             for i in range(counter):
                 obstacle = self.obstacles[i]
-                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < dist_min:
                     is_valid = False
                     break
             if is_valid:
@@ -238,13 +242,13 @@ class PointMassEnv(core.Env):
                 counter += 1
 
         while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box + self.n_moving_obstacles_circle:
-            r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+            r = r_range[0] + self.np_random.rand() * (r_range[1] - r_range[0])
             x = (2 * self.MAX_X - r) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - r) * (self.np_random.rand() - 0.5)
             is_valid = True
             for i in range(counter):
                 obstacle = self.obstacles[i]
-                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < dist_min:
                     is_valid = False
                     break
             if is_valid:
@@ -254,13 +258,13 @@ class PointMassEnv(core.Env):
                 counter += 1
 
         while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box + self.n_moving_obstacles_circle + self.n_static_obstacles_circle:
-            r = 0.1 + self.np_random.rand() * (0.5 - 0.1)
+            r = r_range[0] + self.np_random.rand() * (r_range[1] - r_range[0])
             x = (2 * self.MAX_X - r) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - r) * (self.np_random.rand() - 0.5)
             is_valid = True
             for i in range(counter):
                 obstacle = self.obstacles[i]
-                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < 1:
+                if np.linalg.norm(np.array([obstacle['x'], obstacle['y']]) - np.array([x, y])) < dist_min:
                     is_valid = False
                     break
             if is_valid:
@@ -610,6 +614,7 @@ class PointMassEnv(core.Env):
             pygame.init()
             pygame.display.init()
             self.screen = pygame.display.set_mode((self.SCREEN_DIM, self.SCREEN_DIM))
+            pygame.display.set_caption('Seed: ' + str(self.seed))
         if self.clock is None:
             self.clock = pygame.time.Clock()
 

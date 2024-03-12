@@ -82,13 +82,11 @@ for system in systems_list:
             #--------------------------------- main loop ---------------------------------#
             if args.dataset == 'pointmass':
                 env = PointMassEnv(target=None, max_steps=simulation_timesteps, initial_state=None, epsilon=0.5, reset_target_reached=True, 
-                                bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10,
-                                n_moving_obstacles=0, n_static_obstacles=0)
+                                bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10)
             else:
                 env = Quad2DEnv(target=None, max_steps=simulation_timesteps, initial_state=None, epsilon=0.5, reset_target_reached=True, 
                                 bonus_reward=False, reset_out_of_bounds=True, theta_as_sine_cosine=True, num_episodes=10, 
-                                n_moving_obstacles=0, n_static_obstacles=0, min_rel_thrust=0.75, max_rel_thrust=1.25, 
-                                max_rel_thrust_difference=0.01, test=True)
+                                min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, test=True)
 
             #-----------------Closed-loop experiment with obstacles-----------------------#
             n_reached = 0
@@ -107,7 +105,7 @@ for system in systems_list:
                     
                     # Sample state sequence or state-action sequence
                     # unsafe_bounds = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon)
-                    action, samples = policy(conditions=conditions, batch_size=batch_size, unsafe_bounds=None, verbose=False)
+                    action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False)
 
                     # Step environment
                     if not args.use_actions:

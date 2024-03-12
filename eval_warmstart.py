@@ -2,29 +2,30 @@ import os
 import pickle
 import subprocess
 import time
+import torch
 import numpy as np
 import diffuser.utils as utils
 import diffuser.sampling as sampling
 from envs.quad_2d import Quad2DEnv
 from envs.pointmass import PointMassEnv
+from diffuser.models.mlp import MLP
 
 #-----------------------------------------------------------------------------#
 #----------------------------------- setup -----------------------------------#
 #-----------------------------------------------------------------------------#
-
-data_save_path = 'results/data'
-save_animation = False
+save_data = False
+data_save_path = 'results/data_new_env'
+save_animation = True
 animation_save_path = 'results/animation' if save_animation else None
 
 # List of arguments to pass to the script
-# systems_list = ['pointmass', 'quad2d']
-systems_list = ['pointmass', 'quad2d']
-# n_obstacles_range = [[0, 5]]
-n_obstacles_range = [[0, 5, 0, 5],
-                     [2, 5, 2, 5]]
-with_projections_range = [False, True]
-# with_projections_range = [True]
-warmstart_steps_range = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, False]
+systems_list = ['pointmass']
+n_obstacles_range = [[0, 5, 0, 5]]
+# n_obstacles_range = [[0, 5, 0, 5],
+#                      [2, 5, 2, 5]]
+with_projections_range = [True]
+# warmstart_steps_range = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, False]
+warmstart_steps_range = [5, 10, False]
 
 n_trials = 100
 
@@ -62,6 +63,12 @@ for system in systems_list:
     value_function = value_experiment.ema
     guide_config = utils.Config(args.guide, model=value_function, verbose=False)
     guide = guide_config()
+
+    action_dim = 2 if args.use_actions else 0
+    if not args.use_actions:
+        id_model = MLP(input_size=obs_dim*2, output_size=2)
+        id_model.load_state_dict(torch.load('logs/' + system + '/inverse_dynamics/defaults_H' + str(args.horizon) + '_T' + str(args.n_diffusion_steps) + '_AFalse/model.pt'))
+        id_model.eval()
 
     for idx0, with_projections in enumerate(with_projections_range):
         warmstart_steps_range_mod = warmstart_steps_range if with_projections else [False]
@@ -138,7 +145,10 @@ for system in systems_list:
                         
                         # Sample state sequence or state-action sequence
                         if with_projections:
-                            unsafe_bounds_box, unsafe_bounds_circle = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), horizon=args.horizon, obs_dim=obs_dim)
+                            unsafe_bounds_box, unsafe_bounds_circle = utils.compute_unsafe_regions(env.predict_obstacles(args.horizon), 
+                                                                                                   horizon=args.horizon, 
+                                                                                                   obs_dim=obs_dim, 
+                                                                                                   action_dim=action_dim)
                         else:
                             unsafe_bounds_box, unsafe_bounds_circle = None, None
                             
@@ -146,18 +156,21 @@ for system in systems_list:
                         warm_start_steps = warmstart_steps if warmstart_steps is not False else None
 
                         action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds_box=unsafe_bounds_box, unsafe_bounds_circle=unsafe_bounds_circle,
-                                                 warm_start=warm_start, warm_start_steps=warmstart_steps, verbose=False)
+                                                 warm_start=warm_start, warm_start_steps=warmstart_steps, verbose=False, id_model=id_model)
                         
                         if save_animation:
                             old_path = None if _ == 0 else observations_all[n][:_ + 1, [0, 2]]
                             env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], old_path=old_path, save_path=save_path)
 
                         # Step environment
-                        if not args.use_actions:
-                            next_obs = samples.observations[0, 1, :]
-                            action = env.inverse_dynamics(next_obs)
+                        # if not args.use_actions:
+                        #     next_obs = samples.observations[0, 1, :]
+                        #     with torch.no_grad():
+                        #         normed_action = id_model(torch.tensor(obs).float(), torch.tensor(next_obs).float()).detach().numpy()
+                        #     action = dataset.normalizer.unnormalize(normed_action, 'actions')
                         
                         obs, reward, done, target_reached = env.step(action)
+                        # print('Desired obs: ', next_obs, 'Actual obs: ', obs)
 
                         # Log
                         if _ < env.max_steps - 1:
@@ -211,8 +224,10 @@ for system in systems_list:
                                                         '/warmstart_steps_' + str(warmstart_steps) + \
                                                         '/n_obstacles_' + str(n_obstacles[0]) + '_' + str(n_obstacles[1]) + '_' + str(n_obstacles[2]) + '_' + str(n_obstacles[3])
 
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
-                with open(save_path + '/data.pkl', 'wb') as f:
-                    pickle.dump(results, f)
+                
+                if save_data:
+                    if not os.path.exists(save_path):
+                        os.makedirs(save_path)
+                    with open(save_path + '/data.pkl', 'wb') as f:
+                        pickle.dump(results, f)
         

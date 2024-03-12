@@ -23,7 +23,7 @@ class GuidedPolicy:
         self.sample_kwargs = sample_kwargs
         self.previous_trajectories = None
 
-    def __call__(self, conditions, batch_size=1, unsafe_bounds_box=None, unsafe_bounds_circle=None, warm_start=False, warm_start_steps=None, verbose=True):
+    def __call__(self, conditions, batch_size=1, unsafe_bounds_box=None, unsafe_bounds_circle=None, warm_start=False, warm_start_steps=None, verbose=True, id_model=None):
         conditions = {k: self.preprocess_fn(v) for k, v in conditions.items()}
         conditions = self._format_conditions(conditions, batch_size)
         if unsafe_bounds_box is not None:
@@ -34,7 +34,7 @@ class GuidedPolicy:
             unsafe_bounds_circle = self._format_unsafe_bounds(unsafe_bounds_circle)
             conditions.update({'unsafe_bounds_circle': unsafe_bounds_circle})
         
-        conditions.update({'dims': torch.tensor([2, 4])})
+        conditions.update({'dims': torch.tensor([0 + self.action_dim, 2 + self.action_dim])})
 
         if warm_start and (self.previous_trajectories is not None):
             x_warmstart = torch.cat((self.previous_trajectories[:,1:,:], self.previous_trajectories[:,-1,:].unsqueeze(1)), dim=1)
@@ -58,7 +58,14 @@ class GuidedPolicy:
             action = actions[0, 0]
         else:
             actions = None
-            action = None
+            if id_model is not None:
+                with torch.no_grad():
+                    obs = normed_observations[0, 0]
+                    next_obs = normed_observations[0, 1]
+                    normed_action = id_model(torch.tensor(obs).float(), torch.tensor(next_obs).float()).detach().numpy()
+                    action = self.normalizer.unnormalize(normed_action, 'actions')
+            else:
+                action = None
 
         trajectories = Trajectories(actions, observations, samples.values)
 
@@ -97,8 +104,9 @@ class GuidedPolicy:
         for i, _ in unsafe_bounds.items():
             unsafe_bounds_formatted[i] = np.zeros((self.action_dim + self.diffusion_model.observation_dim, 2 * len(unsafe_bounds[i])))
             for n_obs in range(len(unsafe_bounds[i])):
-                unsafe_bounds_formatted[i][:self.action_dim, 2 * n_obs] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:self.action_dim, 0], 'actions')
-                unsafe_bounds_formatted[i][:self.action_dim, 2 * n_obs + 1] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:self.action_dim, 1], 'actions')
+                if self.action_dim > 0:
+                    unsafe_bounds_formatted[i][:self.action_dim, 2 * n_obs] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:self.action_dim, 0], 'actions')
+                    unsafe_bounds_formatted[i][:self.action_dim, 2 * n_obs + 1] = self.normalizer.normalize(unsafe_bounds[i][n_obs][:self.action_dim, 1], 'actions')
                 unsafe_bounds_formatted[i][self.action_dim:, 2 * n_obs] = self.normalizer.normalize(unsafe_bounds[i][n_obs][self.action_dim:, 0], 'observations')
                 unsafe_bounds_formatted[i][self.action_dim:, 2 * n_obs + 1] = self.normalizer.normalize(unsafe_bounds[i][n_obs][self.action_dim:, 1], 'observations')
         

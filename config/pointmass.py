@@ -39,7 +39,7 @@ base = {
         'preprocess_fns': [],
         'clip_denoised': False,
         'use_padding': False,
-        'use_actions': False,
+        'use_actions': True,
         'max_path_length': 100,
 
         ## serialization
@@ -135,7 +135,7 @@ base = {
         'max_render': 8,
 
         ## Dataset
-        'use_actions': True,
+        'use_actions': False,
 
         ## diffusion model
         'horizon': 16,
