@@ -13,19 +13,19 @@ from diffuser.models.mlp import MLP
 #-----------------------------------------------------------------------------#
 #----------------------------------- setup -----------------------------------#
 #-----------------------------------------------------------------------------#
-save_data = True
+save_data = False
 data_save_path = 'results/data_new_env'
 save_animation = False
 animation_save_path = 'results/animation' if save_animation else None
 
 # List of arguments to pass to the script
 systems_list = ['pointmass', 'quad2d']
-# n_obstacles_range = [[2, 5, 2, 5]]
+# n_obstacles_range = [[0, 5, 0, 5]]
 n_obstacles_range = [[0, 5, 0, 5],
                      [2, 5, 2, 5]]
 with_projections_range = [True]
 # warmstart_steps_range = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, False]
-warmstart_steps_range = [2, 4, 6, 8, 12, 16, False]
+warmstart_steps_range = [2, 4, 6, 8]
 
 scale_range = [100, 10, 1]
 
@@ -36,10 +36,10 @@ seeds_list = None
 # seeds = [0,  2,  4,  5,  7, 12, 13, 14, 17, 19, 22, 25, 27, 28, 30, 31, 32, 38, 42, 44, 45, 46, 47, 50, 55, 58, 59, 60, 61, 62, 66, 67, 69, 70, 73, 77, 78, 79, 81, 82, 83, 87, 93, 94, 95, 96, 99]               # pointmass, dynamic environment (pointmass)
 # seeds = [0, 1, 3, 5, 8, 10, 11, 13, 14, 17, 18, 19, 20, 24, 25, 27, 31, 33, 35, 37, 38, 39, 40, 41, 42, 47, 49, 50, 52, 53, 55, 58, 61, 64, 65, 66, 68, 69, 75, 78, 80, 81, 82, 84, 88, 91, 94, 96]               # quad2d, static environment
 # seeds = [1, 2, 5, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 24, 25, 26, 28, 29, 31, 33, 34, 40, 41, 47, 48, 52, 53, 54, 56, 59, 62, 65, 66, 67, 69, 72, 74, 78, 81, 82, 84, 86, 87, 88, 89, 93, 96, 97, 98, 99]   # quad2d, dynamic environment
-seeds_list = [[4, 5, 6, 17, 18, 19, 22, 26, 31, 32, 33, 40, 41, 42, 43, 46, 47, 52, 54, 56, 57, 60, 64, 70, 71, 73, 75, 76, 77, 78, 80, 86, 89, 92, 94, 98],
-              [0,  2,  4,  5,  7, 12, 13, 14, 17, 19, 22, 25, 27, 28, 30, 31, 32, 38, 42, 44, 45, 46, 47, 50, 55, 58, 59, 60, 61, 62, 66, 67, 69, 70, 73, 77, 78, 79, 81, 82, 83, 87, 93, 94, 95, 96, 99],
-              [0, 1, 3, 5, 8, 10, 11, 13, 14, 17, 18, 19, 20, 24, 25, 27, 31, 33, 35, 37, 38, 39, 40, 41, 42, 47, 49, 50, 52, 53, 55, 58, 61, 64, 65, 66, 68, 69, 75, 78, 80, 81, 82, 84, 88, 91, 94, 96],
-              [1, 2, 5, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 24, 25, 26, 28, 29, 31, 33, 34, 40, 41, 47, 48, 52, 53, 54, 56, 59, 62, 65, 66, 67, 69, 72, 74, 78, 81, 82, 84, 86, 87, 88, 89, 93, 96, 97, 98, 99]]
+# seeds_list = [[4, 5, 6, 17, 18, 19, 22, 26, 31, 32, 33, 40, 41, 42, 43, 46, 47, 52, 54, 56, 57, 60, 64, 70, 71, 73, 75, 76, 77, 78, 80, 86, 89, 92, 94, 98],
+#               [0,  2,  4,  5,  7, 12, 13, 14, 17, 19, 22, 25, 27, 28, 30, 31, 32, 38, 42, 44, 45, 46, 47, 50, 55, 58, 59, 60, 61, 62, 66, 67, 69, 70, 73, 77, 78, 79, 81, 82, 83, 87, 93, 94, 95, 96, 99],
+#               [0, 1, 3, 5, 8, 10, 11, 13, 14, 17, 18, 19, 20, 24, 25, 27, 31, 33, 35, 37, 38, 39, 40, 41, 42, 47, 49, 50, 52, 53, 55, 58, 61, 64, 65, 66, 68, 69, 75, 78, 80, 81, 82, 84, 88, 91, 94, 96],
+#               [1, 2, 5, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 24, 25, 26, 28, 29, 31, 33, 34, 40, 41, 47, 48, 52, 53, 54, 56, 59, 62, 65, 66, 67, 69, 72, 74, 78, 81, 82, 84, 86, 87, 88, 89, 93, 96, 97, 98, 99]]
 
 for system in systems_list:
     # Store success rate and reward
@@ -54,6 +54,10 @@ for system in systems_list:
         config: str = 'config.' + system
 
     args = Parser().parse_args('plan')
+
+    ## DELETE
+    args.batch_size = 32        
+    ## DELETE
 
     ## load diffusion model and value function from disk
     diffusion_experiment = utils.load_diffusion(
@@ -188,21 +192,13 @@ for system in systems_list:
                             warm_start_steps = warmstart_steps if warmstart_steps is not False else None
 
                             action, samples = policy(conditions=conditions, batch_size=args.batch_size, unsafe_bounds_box=unsafe_bounds_box, unsafe_bounds_circle=unsafe_bounds_circle,
-                                                    warm_start=warm_start, warm_start_steps=warmstart_steps, verbose=False, id_model=id_model)
+                                                    warm_start_steps=warmstart_steps, verbose=False, id_model=id_model)
                             
                             if save_animation:
                                 old_path = None if _ == 0 else observations_all[n][:_ + 1, [0, 2]]
                                 env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], old_path=old_path, save_path=save_path)
-
-                            # Step environment
-                            # if not args.use_actions:
-                            #     next_obs = samples.observations[0, 1, :]
-                            #     with torch.no_grad():
-                            #         normed_action = id_model(torch.tensor(obs).float(), torch.tensor(next_obs).float()).detach().numpy()
-                            #     action = dataset.normalizer.unnormalize(normed_action, 'actions')
-                            
+                           
                             obs, reward, done, target_reached = env.step(action)
-                            # print('Desired obs: ', next_obs, 'Actual obs: ', obs)
 
                             # Log
                             if _ < env.max_steps - 1:

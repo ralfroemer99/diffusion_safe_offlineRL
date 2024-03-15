@@ -39,7 +39,7 @@ class Quad2DEnv(core.Env):
     # observation = [x, dx, y, dy, sin(theta), cos(theta), dtheta, x_des, y_des]
 
     def __init__(self, min_rel_thrust=0.75, max_rel_thrust=1.25, max_rel_thrust_difference=0.01, g=9.81, 
-                 target=None, max_steps=100, num_episodes=1000, epsilon=0.2, reset_target_reached=False, 
+                 target=None, max_steps=100, num_episodes=10, epsilon=0.2, reset_target_reached=False, 
                  reset_out_of_bounds=False, bonus_reward=False, initial_state=None, theta_as_sine_cosine=True,
                  n_moving_obstacles_box=0, n_static_obstacles_box=0, n_moving_obstacles_circle=0, n_static_obstacles_circle=0,
                  reward='squared_distance', test=False, seed=0):

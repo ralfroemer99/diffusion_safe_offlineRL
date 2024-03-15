@@ -23,7 +23,7 @@ class GuidedPolicy:
         self.sample_kwargs = sample_kwargs
         self.previous_trajectories = None
 
-    def __call__(self, conditions, batch_size=1, unsafe_bounds_box=None, unsafe_bounds_circle=None, warm_start=False, warm_start_steps=None, verbose=True, id_model=None):
+    def __call__(self, conditions, batch_size=1, unsafe_bounds_box=None, unsafe_bounds_circle=None, warm_start_steps=None, verbose=True, id_model=None):
         conditions = {k: self.preprocess_fn(v) for k, v in conditions.items()}
         conditions = self._format_conditions(conditions, batch_size)
         if unsafe_bounds_box is not None:
@@ -36,7 +36,7 @@ class GuidedPolicy:
         
         conditions.update({'dims': torch.tensor([0 + self.action_dim, 2 + self.action_dim])})
 
-        if warm_start and (self.previous_trajectories is not None):
+        if (warm_start_steps is not None) and (self.previous_trajectories is not None):
             x_warmstart = torch.cat((self.previous_trajectories[:,1:,:], self.previous_trajectories[:,-1,:].unsqueeze(1)), dim=1)
             conditions.update({'x_warmstart': x_warmstart})
             conditions.update({'n_warmstart_steps': warm_start_steps})
