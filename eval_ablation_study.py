@@ -22,7 +22,7 @@ scale_range = np.logspace(0, 4, 5)
 batch_size_range = [1, 2, 4, 8, 16]
 # with_actions_range = [False, True]
 
-n_trials = 1
+n_trials = 100
 
 for system in systems_list:
     class Parser(utils.Parser):
@@ -48,6 +48,7 @@ for system in systems_list:
     # Store success rate and reward
     success_rate_all = np.zeros((len(batch_size_range), len(scale_range)))
     reward_mean_all = np.zeros((len(batch_size_range), len(scale_range)))
+    steps_mean_all = np.zeros((len(batch_size_range), len(scale_range)))
 
     obs_dim = 6 if system == 'pointmass' else 9
     simulation_timesteps = 100 if system == 'pointmass' else 200
@@ -57,6 +58,8 @@ for system in systems_list:
         id_model = MLP(input_size=obs_dim*2, output_size=2)
         id_model.load_state_dict(torch.load('logs/' + system + '/inverse_dynamics/defaults_H' + str(args.horizon) + '_T' + str(args.n_diffusion_steps) + '_AFalse/model.pt'))
         id_model.eval()
+    else:
+        id_model = None
 
     for idx0, batch_size in enumerate(batch_size_range):
         for idx1, scale in enumerate(scale_range):
@@ -129,10 +132,13 @@ for system in systems_list:
 
             success_rate = n_reached / n_trials
             reward_mean = np.mean(reward_all[reward_all != 0])
+            steps_mean = n_steps / n_trials
+
             success_rate_all[idx0, idx1] = success_rate
             reward_mean_all[idx0, idx1] = reward_mean
+            steps_mean_all[idx0, idx1] = steps_mean
 
-            print(f'{args.dataset}, use actions: {args.use_actions}, scale: {round(scale, 2)}, batch_size: {batch_size}, SUCCESS RATE: {success_rate}, MEAN REWARD: {round(reward_mean, 2)}')
+            print(f'{args.dataset}, use actions: {args.use_actions}, scale: {round(scale, 2)}, batch_size: {batch_size}, SUCCESS RATE: {success_rate}, MEAN STEPS: {round(steps_mean, 2)}, MEAN REWARD: {round(reward_mean, 2)}')
 
             results = {'system': system,
                         'use_actions': args.use_actions,
@@ -142,6 +148,7 @@ for system in systems_list:
                         'trial': range(n_trials),
                         'success_rate': success_rate,
                         'reward_mean': reward_mean,
+                        'steps_mean': n_steps / n_trials,
                         'observations_all': observations_all,
                         'actions_all': actions_all,
                         'rewards_all': reward_all,
@@ -172,6 +179,6 @@ for system in systems_list:
 
     print('-----------------------------------------------------------------------------------------------------------------')
     for _, batch_size in enumerate(batch_size_range):
-        print(f'System: {args.dataset}, use actions: {args.use_actions}, BATCH_SIZE: {batch_size}, SCALES: {np.round(scale_range, 2)}, SUCCESS_RATE: {np.round(success_rate_all[_, :], 2)}, REWARD: {np.round(reward_mean_all[_, :], 2)}')
+        print(f'System: {args.dataset}, use actions: {args.use_actions}, BATCH_SIZE: {batch_size}, SCALES: {np.round(scale_range, 2)}, SUCCESS_RATE: {np.round(success_rate_all[_, :], 2)}, STEPS: {np.round(steps_mean_all[_, :], 2)}, REWARD: {np.round(reward_mean_all[_, :], 2)}')
     print('-----------------------------------------------------------------------------------------------------------------')
     
