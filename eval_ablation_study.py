@@ -12,7 +12,7 @@ from diffuser.models.mlp import MLP
 #----------------------------------- setup -----------------------------------#
 #-----------------------------------------------------------------------------#
 
-data_save_path = 'results/data_new_env'
+data_save_path = 'results/scale_batch_ablation'
 with_projections = False
 warmstart_steps = None
 
@@ -22,7 +22,7 @@ scale_range = np.logspace(0, 4, 5)
 batch_size_range = [1, 2, 4, 8, 16]
 # with_actions_range = [False, True]
 
-n_trials = 100
+n_trials = 1
 
 for system in systems_list:
     class Parser(utils.Parser):
@@ -78,6 +78,7 @@ for system in systems_list:
 
             #-----------------Closed-loop experiment with obstacles-----------------------#
             n_reached = 0
+            n_steps = 0
             observations_all = np.zeros((n_trials, simulation_timesteps, obs_dim))
             actions_all = np.zeros((n_trials, simulation_timesteps, 2))
             reward_all = np.zeros((n_trials, simulation_timesteps))
@@ -121,7 +122,9 @@ for system in systems_list:
                     if target_reached == True:
                         n_reached += 1
                         target_reached_all[n] = 1
+                        n_steps += _ + 1
                     if done:
+                        n_steps += env.max_steps if target_reached == False else 0
                         break
 
             success_rate = n_reached / n_trials
@@ -137,7 +140,8 @@ for system in systems_list:
                         'warmstart_steps': warmstart_steps,
                         'n_obstacles': [0, 0, 0, 0],
                         'trial': range(n_trials),
-                        'success_rate': success_rate_all,
+                        'success_rate': success_rate,
+                        'reward_mean': reward_mean,
                         'observations_all': observations_all,
                         'actions_all': actions_all,
                         'rewards_all': reward_all,
@@ -150,14 +154,16 @@ for system in systems_list:
                             '/projection_' + str(with_projections) + \
                             '/no_warmstart' + \
                             '/scale_' + str(scale) + \
-                            '/n_obstacles_' + str(0) + '_' + str(0) + '_' + str(0) + '_' + str(0)
+                            '/n_obstacles_' + str(0) + '_' + str(0) + '_' + str(0) + '_' + str(0) + \
+                            '/batch_size_' + str(batch_size)
             else:
                 save_path = data_save_path  + '/' + system + \
                             '/use_actions_' + str(args.use_actions) + \
                             '/projection_' + str(with_projections) + \
                             '/warmstart_steps_' + str(warmstart_steps) + \
                             '/scale_' + str(scale) + \
-                            '/n_obstacles_' + str(0) + '_' + str(0) + '_' + str(0) + '_' + str(0)
+                            '/n_obstacles_' + str(0) + '_' + str(0) + '_' + str(0) + '_' + str(0) + \
+                            '/batch_size_' + str(batch_size)
 
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
