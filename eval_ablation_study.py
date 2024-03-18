@@ -106,8 +106,8 @@ for system in systems_list:
                     action, samples = policy(conditions=conditions, batch_size=batch_size, verbose=False, id_model=id_model)
 
                     # Step environment
-                    old_path = None if _ == 0 else observations_all[n][:_ + 1, [0, 2]]
-                    env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], old_path=old_path)
+                    # old_path = None if _ == 0 else observations_all[n][:_ + 1, [0, 2]]
+                    # env.render(trajectories_to_plot=samples.observations[:, :, [0, 2]], old_path=old_path)
 
                     obs, reward, done, target_reached = env.step(action)
 
