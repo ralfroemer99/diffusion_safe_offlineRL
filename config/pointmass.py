@@ -135,7 +135,7 @@ base = {
         'max_render': 8,
 
         ## Dataset
-        'use_actions': False,
+        'use_actions': True,
 
         ## diffusion model
         'horizon': 16,

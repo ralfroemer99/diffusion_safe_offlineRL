@@ -17,7 +17,7 @@ with_projections = False
 warmstart_steps = None
 
 # List of arguments to pass to the script
-systems_list = ['pointmass', 'quad2d']
+systems_list = ['pointmass']
 scale_range = np.logspace(0, 4, 5)
 batch_size_range = [1, 2, 4, 8, 16]
 # with_actions_range = [False, True]
