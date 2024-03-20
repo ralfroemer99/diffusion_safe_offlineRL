@@ -13,7 +13,7 @@ from diffuser.models.mlp import MLP
 #-----------------------------------------------------------------------------#
 #----------------------------------- setup -----------------------------------#
 #-----------------------------------------------------------------------------#
-save_data = True
+save_data = False
 data_save_path = 'results/data'
 save_animation = True
 animation_save_path = 'results/animation' if save_animation else None
@@ -23,9 +23,9 @@ systems_list = ['pointmass', 'quad2d']
 # n_obstacles_range = [[0, 5, 0, 5]]
 n_obstacles_range = [[0, 5, 0, 5],
                      [2, 5, 2, 5]]
-with_projections_range = [True]
+with_projections_range = [False]
 # warmstart_steps_range = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, False]
-warmstart_steps_range = [2, 4, 6, 8, 10, 18]
+warmstart_steps_range = [None]
 
 scale_range = [100]
 
