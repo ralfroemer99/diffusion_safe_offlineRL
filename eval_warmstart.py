@@ -13,33 +13,23 @@ from diffuser.models.mlp import MLP
 #-----------------------------------------------------------------------------#
 #----------------------------------- setup -----------------------------------#
 #-----------------------------------------------------------------------------#
-save_data = False
+save_data = True
 data_save_path = 'results/data'
-save_animation = True
+save_animation = False
 animation_save_path = 'results/animation' if save_animation else None
 
 # List of arguments to pass to the script
-systems_list = ['pointmass', 'quad2d']
-# n_obstacles_range = [[0, 5, 0, 5]]
+systems_list = ['quad2d']
 n_obstacles_range = [[0, 5, 0, 5],
                      [2, 5, 2, 5]]
-with_projections_range = [False]
-# warmstart_steps_range = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, False]
-warmstart_steps_range = [None]
+with_projections_range = [True, False]
+warmstart_steps_range = [2, None]
 
 scale_range = [100]
 
-n_trials = 100
+n_trials = 1
 
 seeds_list = None
-# seeds = [4, 5, 6, 17, 18, 19, 22, 26, 31, 32, 33, 40, 41, 42, 43, 46, 47, 52, 54, 56, 57, 60, 64, 70, 71, 73, 75, 76, 77, 78, 80, 86, 89, 92, 94, 98]                                                             # pointmass, static environment   (pointmass)
-# seeds = [0,  2,  4,  5,  7, 12, 13, 14, 17, 19, 22, 25, 27, 28, 30, 31, 32, 38, 42, 44, 45, 46, 47, 50, 55, 58, 59, 60, 61, 62, 66, 67, 69, 70, 73, 77, 78, 79, 81, 82, 83, 87, 93, 94, 95, 96, 99]               # pointmass, dynamic environment (pointmass)
-# seeds = [0, 1, 3, 5, 8, 10, 11, 13, 14, 17, 18, 19, 20, 24, 25, 27, 31, 33, 35, 37, 38, 39, 40, 41, 42, 47, 49, 50, 52, 53, 55, 58, 61, 64, 65, 66, 68, 69, 75, 78, 80, 81, 82, 84, 88, 91, 94, 96]               # quad2d, static environment
-# seeds = [1, 2, 5, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 24, 25, 26, 28, 29, 31, 33, 34, 40, 41, 47, 48, 52, 53, 54, 56, 59, 62, 65, 66, 67, 69, 72, 74, 78, 81, 82, 84, 86, 87, 88, 89, 93, 96, 97, 98, 99]   # quad2d, dynamic environment
-# seeds_list = [[4, 5, 6, 17, 18, 19, 22, 26, 31, 32, 33, 40, 41, 42, 43, 46, 47, 52, 54, 56, 57, 60, 64, 70, 71, 73, 75, 76, 77, 78, 80, 86, 89, 92, 94, 98],
-#               [0,  2,  4,  5,  7, 12, 13, 14, 17, 19, 22, 25, 27, 28, 30, 31, 32, 38, 42, 44, 45, 46, 47, 50, 55, 58, 59, 60, 61, 62, 66, 67, 69, 70, 73, 77, 78, 79, 81, 82, 83, 87, 93, 94, 95, 96, 99],
-#               [0, 1, 3, 5, 8, 10, 11, 13, 14, 17, 18, 19, 20, 24, 25, 27, 31, 33, 35, 37, 38, 39, 40, 41, 42, 47, 49, 50, 52, 53, 55, 58, 61, 64, 65, 66, 68, 69, 75, 78, 80, 81, 82, 84, 88, 91, 94, 96],
-#               [1, 2, 5, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 24, 25, 26, 28, 29, 31, 33, 34, 40, 41, 47, 48, 52, 53, 54, 56, 59, 62, 65, 66, 67, 69, 72, 74, 78, 81, 82, 84, 86, 87, 88, 89, 93, 96, 97, 98, 99]]
 
 for system in systems_list:
     # Store success rate and reward
@@ -202,7 +192,7 @@ for system in systems_list:
                                 target_reached_all[n] = 1
                                 n_steps += _ + 1
                             if done:
-                                n_steps += env.max_steps if target_reached == False else 0
+                                n_steps += env.max_steps if target_reached != True else 0
                                 break
 
                         reward_total += (reward_all[n] * np.power(args.discount, np.arange(len(reward_all[n])))).sum()
