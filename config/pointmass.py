@@ -115,7 +115,7 @@ base = {
         'guide': 'sampling.ValueGuide',
         'policy': 'sampling.GuidedPolicy',
         'max_episode_length': 100,
-        'batch_size': 8,
+        'batch_size': 16,
         'preprocess_fns': [],
         'device': 'cuda',
         'seed': 0,
@@ -135,7 +135,7 @@ base = {
         'max_render': 8,
 
         ## Dataset
-        'use_actions': True,
+        'use_actions': False,
 
         ## diffusion model
         'horizon': 16,

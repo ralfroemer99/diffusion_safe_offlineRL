@@ -205,14 +205,14 @@ class PointMassEnv(core.Env):
             Generate the obstacles for the environment.
             Ordering: [moving_boxes, static_boxes, moving_circles, static_circles]
         '''
-        d_range = [0.2, 1.0]
-        r_range = [0.2, 1.0]
+        
+        d_min, d_max, r_min, r_max = 0.1, 0.5, 0.1, 0.5
         dist_min = 2.0
         self.obstacles = []
 
         counter = 0
         while counter < self.n_moving_obstacles_box:
-            d = d_range[0] + self.np_random.rand() * (d_range[1] - d_range[0])
+            d = d_min + self.np_random.rand() * (d_max - d_min)
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
             is_valid = True
@@ -228,7 +228,7 @@ class PointMassEnv(core.Env):
                 counter += 1
 
         while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box:
-            d = d_range[0] + self.np_random.rand() * (d_range[1] - d_range[0])
+            d = d_min + self.np_random.rand() * (d_max - d_min)
             x = (2 * self.MAX_X - d) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - d) * (self.np_random.rand() - 0.5)
             is_valid = True
@@ -242,7 +242,7 @@ class PointMassEnv(core.Env):
                 counter += 1
 
         while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box + self.n_moving_obstacles_circle:
-            r = r_range[0] + self.np_random.rand() * (r_range[1] - r_range[0])
+            r = r_min + self.np_random.rand() * (r_max - r_min)
             x = (2 * self.MAX_X - r) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - r) * (self.np_random.rand() - 0.5)
             is_valid = True
@@ -258,7 +258,7 @@ class PointMassEnv(core.Env):
                 counter += 1
 
         while counter < self.n_moving_obstacles_box + self.n_static_obstacles_box + self.n_moving_obstacles_circle + self.n_static_obstacles_circle:
-            r = r_range[0] + self.np_random.rand() * (r_range[1] - r_range[0])
+            r = r_min + self.np_random.rand() * (r_max - r_min)
             x = (2 * self.MAX_X - r) * (self.np_random.rand() - 0.5)
             y = (2 * self.MAX_Y - r) * (self.np_random.rand() - 0.5)
             is_valid = True
