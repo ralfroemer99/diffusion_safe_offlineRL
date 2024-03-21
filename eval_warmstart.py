@@ -22,12 +22,12 @@ animation_save_path = 'results/animation' if save_animation else None
 systems_list = ['quad2d']
 n_obstacles_range = [[0, 5, 0, 5],
                      [2, 5, 2, 5]]
-with_projections_range = [True, False]
-warmstart_steps_range = [2, None]
+with_projections_range = [True]
+warmstart_steps_range = [2, 4, 6, 8, 10, None]
 
 scale_range = [100]
 
-n_trials = 1
+n_trials = 100
 
 seeds_list = None
 
