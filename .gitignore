@@ -1,4 +1,4 @@
-./data/*
+training_data/*
 logs/*
 results/animation/
 
