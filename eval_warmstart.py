@@ -23,9 +23,9 @@ systems_list = ['quad2d']
 n_obstacles_range = [[0, 5, 0, 5],
                      [2, 5, 2, 5]]
 with_projections_range = [True]
-warmstart_steps_range = [2, 4, 6, 8, 10, None]
+warmstart_steps_range = [6, 8, 10, None]
 
-scale_range = [100]
+scale_range = [1000]
 
 n_trials = 100
 

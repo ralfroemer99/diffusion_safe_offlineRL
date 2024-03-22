@@ -490,7 +490,7 @@ class PointMassEnv(core.Env):
         return dataset
     
     def get_dataset(self):
-        path = 'data/pointmass_dataset.pkl'
+        path = 'training_data/pointmass_dataset.pkl'
         # Check if there is a file at the specified path
         try:
             with open(path, 'rb') as f:

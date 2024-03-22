@@ -500,7 +500,7 @@ class Quad2DEnv(core.Env):
         return dataset
     
     def get_dataset(self):
-        path = 'data/quad2d_dataset.pkl'
+        path = 'training_data/quad2d_dataset.pkl'
         # Check if there is a file at the specified path
         try:
             with open(path, 'rb') as f:
