@@ -25,7 +25,7 @@ n_obstacles_range = [[0, 5, 0, 5],
 with_projections_range = [True]
 warmstart_steps_range = [6, 8, 10, None]
 
-scale_range = [1000]
+scale_range = [100]
 
 n_trials = 100
 

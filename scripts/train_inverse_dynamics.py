@@ -39,7 +39,7 @@ dataset = dataset_config()
 save_path = 'logs/' + exp + '/inverse_dynamics/defaults_H' + str(args.horizon) + '_T' + str(args.n_diffusion_steps) + '_AFalse/model.pt'
 
 # n_episodes = dataset.n_episodes
-n_episodes = 100000
+n_episodes = 1e5
 obs_dim = dataset.observation_dim
 action_dim = dataset.action_dim
 
